@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  label     String
+  icon      String
+  order     Int       @default(0)
+  companies Company[]
+  createdAt DateTime  @default(now())
+}
+
+model Company {
+  id         String     @id @default(cuid())
+  slug       String     @unique
+  label      String
+  icon       String
+  color      String
+  logoUrl    String
+  websiteUrl String
+  docTypes   String[]
+  categoryId String
+  category   Category   @relation(fields: [categoryId], references: [id])
+  documents  Document[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Document {
+  id           String    @id @default(cuid())
+  name         String
+  originalName String
+  fileKey      String
+  fileUrl      String
+  mimeType     String
+  sizeBytes    Int
+  docType      String
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedBy   String
+  uploaderName String
+  shareToken   String?   @unique
+  shareExpiry  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId, docType])
+  @@index([shareToken])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  docId     String?
+  companyId String?
+  meta      Json?
+  createdAt DateTime @default(now())
+}

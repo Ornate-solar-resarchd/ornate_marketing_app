@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "../..",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "paths": {
+      "@ornate/types": ["../../packages/types/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../packages/types/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
