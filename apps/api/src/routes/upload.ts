@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 import rateLimit from "express-rate-limit";
 
-const router = Router();
+const router: Router = Router();
 
 const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,

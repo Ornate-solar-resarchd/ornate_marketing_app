@@ -7,7 +7,7 @@ import {
 } from "../services/document.service";
 import { logger } from "../lib/logger";
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   "/documents/:id/share",
@@ -15,7 +15,7 @@ router.post(
   requirePermission("share"),
   async (req, res) => {
     try {
-      const result = await generateShareLink(req.params.id, req.user!.userId);
+      const result = await generateShareLink(req.params.id as string, req.user!.userId);
       res.json(result);
     } catch (error) {
       logger.error("Error generating share link:", error);

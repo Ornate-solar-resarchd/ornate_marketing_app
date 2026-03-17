@@ -8,7 +8,7 @@ import {
 } from "../services/document.service";
 import { logger } from "../lib/logger";
 
-const router = Router();
+const router: Router = Router();
 
 router.get("/companies/:id/documents", async (req, res) => {
   try {
@@ -56,7 +56,7 @@ router.delete(
   async (req, res) => {
     try {
       const result = await deleteDocument(
-        req.params.id,
+        req.params.id as string,
         req.user!.userId,
         req.user!.role
       );

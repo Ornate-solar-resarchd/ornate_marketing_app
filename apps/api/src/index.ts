@@ -10,7 +10,7 @@ import shareRouter from "./routes/share";
 import searchRouter from "./routes/search";
 import adminRouter from "./routes/admin";
 
-const app = express();
+const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
 
 // Global middleware

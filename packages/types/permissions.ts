@@ -1,7 +1,7 @@
 export const ROLES = ["super_admin", "admin", "manager", "viewer"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const PERMISSIONS = {
+export const PERMISSIONS: Record<string, readonly Role[]> = {
   view_documents: ["super_admin", "admin", "manager", "viewer"],
   download: ["super_admin", "admin", "manager", "viewer"],
   upload: ["super_admin", "admin", "manager"],
@@ -10,7 +10,7 @@ export const PERMISSIONS = {
   share: ["super_admin", "admin", "manager"],
   manage_companies: ["super_admin", "admin"],
   manage_users: ["super_admin"],
-} satisfies Record<string, Role[]>;
+};
 
 export type Permission = keyof typeof PERMISSIONS;
 

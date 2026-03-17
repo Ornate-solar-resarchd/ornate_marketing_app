@@ -2,7 +2,7 @@ import { Router } from "express";
 import { searchDocuments } from "../services/search.service";
 import { logger } from "../lib/logger";
 
-const router = Router();
+const router: Router = Router();
 
 router.get("/search", async (req, res) => {
   try {

@@ -6,7 +6,7 @@ import { deleteFromS3 } from "../services/s3.service";
 import { CreateCompanySchema, ROLES } from "@ornate/types";
 import { logger } from "../lib/logger";
 
-const router = Router();
+const router: Router = Router();
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
 });
@@ -50,11 +50,12 @@ router.patch(
         return;
       }
 
-      await clerkClient.users.updateUserMetadata(req.params.id, {
+      const userId = req.params.id as string;
+      await clerkClient.users.updateUserMetadata(userId, {
         publicMetadata: { role },
       });
 
-      res.json({ message: "Role updated", userId: req.params.id, role });
+      res.json({ message: "Role updated", userId, role });
     } catch (error) {
       logger.error("Error updating user role:", error);
       res.status(500).json({ error: "Failed to update role", code: "UPDATE_ERROR" });
@@ -93,7 +94,7 @@ router.patch(
   async (req, res) => {
     try {
       const company = await prisma.company.update({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         data: req.body,
       });
       res.json(company);
@@ -110,20 +111,21 @@ router.delete(
   requirePermission("manage_companies"),
   async (req, res) => {
     try {
+      const companyId = req.params.id as string;
       const documents = await prisma.document.findMany({
-        where: { companyId: req.params.id },
+        where: { companyId },
         select: { fileKey: true },
       });
 
       await Promise.all(documents.map((doc) => deleteFromS3(doc.fileKey)));
 
-      await prisma.company.delete({ where: { id: req.params.id } });
+      await prisma.company.delete({ where: { id: companyId } });
 
       await prisma.auditLog.create({
         data: {
           userId: req.user!.userId,
           action: "delete",
-          companyId: req.params.id,
+          companyId,
           meta: { type: "company", filesDeleted: documents.length },
         },
       });
