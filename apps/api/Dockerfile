@@ -37,17 +37,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 
-# Copy shared types (needed at runtime for compiled JS imports)
+# Copy shared types (needed at runtime)
 COPY --from=build /app/packages/types ./packages/types
 
 # Copy compiled JS output
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 
-# Copy Prisma schema + generated client
+# Copy Prisma schema
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-COPY --from=build /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
 
-# Copy package files (needed for prisma seed)
+# Copy generated Prisma client (pnpm hoists it to root node_modules)
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copy package files
 COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/apps/api/tsconfig.json ./apps/api/
 
