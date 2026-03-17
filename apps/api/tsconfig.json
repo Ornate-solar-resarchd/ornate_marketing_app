@@ -3,9 +3,10 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "../..",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "strict": true,
+    "esModuleInterop": true,
     "paths": {
       "@ornate/types": ["../../packages/types/index.ts"]
     }
