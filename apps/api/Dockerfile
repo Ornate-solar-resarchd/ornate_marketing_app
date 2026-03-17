@@ -1,5 +1,6 @@
 # ---- Base ----
 FROM node:20-alpine AS base
+RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
@@ -22,13 +23,12 @@ COPY packages/types ./packages/types
 COPY apps/api ./apps/api
 COPY tsconfig.json ./
 
-# Generate Prisma client
+# Generate Prisma client for linux-musl-arm64
+ENV PRISMA_ENGINES_MIRROR=https://binaries.prisma.sh
 RUN cd apps/api && npx prisma generate
 
 ENV NODE_ENV=production
 EXPOSE 4000
 
 WORKDIR /app/apps/api
-
-# Run with tsx (handles TypeScript + path resolution directly)
 CMD ["npx", "tsx", "src/index.ts"]
