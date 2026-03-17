@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function OldCompanyPage({ params }: { params: { category: string; company: string } }) {
-  redirect(`/dashboard/${params.category}/${params.company}`);
+export default async function OldCompanyPage({ params }: { params: Promise<{ category: string; company: string }> }) {
+  const { category, company } = await params;
+  redirect(`/dashboard/${category}/${company}`);
 }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function OldCategoryPage({ params }: { params: { category: string } }) {
-  redirect(`/dashboard/${params.category}`);
+export default async function OldCategoryPage({ params }: { params: Promise<{ category: string }> }) {
+  const { category } = await params;
+  redirect(`/dashboard/${category}`);
 }
