@@ -22,8 +22,8 @@ COPY packages/types ./packages/types
 COPY apps/api ./apps/api
 COPY tsconfig.json ./
 
-# Generate Prisma client
-RUN cd apps/api && npx prisma generate
+# Generate Prisma client and find where it goes
+RUN cd apps/api && npx prisma generate && find /app -path "*/prisma/client" -type d 2>/dev/null | head -5 && find /app -name ".prisma" -type d 2>/dev/null | head -5
 
 # Build TypeScript
 RUN cd apps/api && npx tsc
@@ -33,11 +33,11 @@ FROM node:20-alpine AS runner
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-# Copy node_modules (includes prisma CLI for migrations)
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+# Copy entire node_modules from build (includes pnpm store + prisma client)
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 
-# Copy shared types (needed at runtime)
+# Copy shared types
 COPY --from=build /app/packages/types ./packages/types
 
 # Copy compiled JS output
@@ -45,10 +45,6 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 
 # Copy Prisma schema
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-
-# Copy generated Prisma client (pnpm hoists it to root node_modules)
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy package files
 COPY --from=build /app/apps/api/package.json ./apps/api/
