@@ -2,8 +2,8 @@ node_modules/
 dist/
 .next/
 .env
-.env.local
-.env.*.local
+.env.*
+*.pem
 *.log
 .DS_Store
 .turbo

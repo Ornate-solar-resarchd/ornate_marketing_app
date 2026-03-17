@@ -12,31 +12,44 @@ RUN pnpm install --frozen-lockfile
 
 # ---- Build ----
 FROM base AS build
+WORKDIR /app
+
+# Copy dependency tree from deps stage
 COPY --from=deps /app ./
-COPY . .
+
+# Copy all source files
+COPY packages/types ./packages/types
+COPY apps/api ./apps/api
+COPY tsconfig.json ./
 
 # Generate Prisma client
 RUN cd apps/api && npx prisma generate
 
-# Build TypeScript (rootDir is ../.., so output goes to dist/apps/api/src and dist/packages/types)
+# Build TypeScript
 RUN cd apps/api && npx tsc
 
 # ---- Production ----
 FROM node:20-alpine AS runner
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-# Copy node_modules (production deps)
+# Copy node_modules (includes prisma CLI for migrations)
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 
-# Copy compiled JS
+# Copy shared types (needed at runtime for compiled JS imports)
+COPY --from=build /app/packages/types ./packages/types
+
+# Copy compiled JS output
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 
 # Copy Prisma schema + generated client
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 COPY --from=build /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
 
-COPY apps/api/package.json ./apps/api/
+# Copy package files (needed for prisma seed)
+COPY --from=build /app/apps/api/package.json ./apps/api/
+COPY --from=build /app/apps/api/tsconfig.json ./apps/api/
 
 ENV NODE_ENV=production
 EXPOSE 4000
