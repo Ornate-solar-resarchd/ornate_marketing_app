@@ -25,7 +25,7 @@ export default function SignUpPage() {
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://i.ibb.co/spgKSWdX"
+              src="https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png"
               alt="Ornate Solar"
               className="h-12 object-contain"
             />
