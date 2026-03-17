@@ -13,7 +13,7 @@ export const DOC_TYPES = {
   email: {
     label: "Email Template",
     icon: "✉️",
-    accept: ".html,.pdf,.docx,.eml",
+    accept: ".html,.pdf,.docx,.eml,.jpg,.jpeg,.png",
   },
   compliance: { label: "Compliance Docs", icon: "🛡️", accept: ".pdf,.docx" },
   casestudy: {

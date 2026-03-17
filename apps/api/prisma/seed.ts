@@ -45,7 +45,7 @@ async function main() {
       icon: "⚡",
       color: "#006297",
       logoUrl:
-        "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
+        "https://i.ibb.co/vvHCyg7f/Unity-Logo-White.png",
       websiteUrl: "https://ornatesolar.com",
       docTypes: [
         "brochure",
@@ -247,7 +247,7 @@ async function main() {
       icon: "⚙️",
       color: "#1D4ED8",
       logoUrl:
-        "https://www.solaredge.com/sites/default/files/solaredge-logo.png",
+        "https://i.ibb.co/0yVq9ZkF/Whats-App-Image-2026-03-17-at-12-46-01-PM.jpg",
       websiteUrl: "https://www.solaredge.com",
       docTypes: [
         "brochure",
@@ -319,7 +319,7 @@ async function main() {
   for (const company of ornateCompanies) {
     await prisma.company.upsert({
       where: { slug: company.slug },
-      update: {},
+      update: { logoUrl: company.logoUrl, docTypes: company.docTypes },
       create: { ...company, categoryId: ornateProducts.id },
     });
   }
@@ -327,7 +327,7 @@ async function main() {
   for (const company of panelCompanies) {
     await prisma.company.upsert({
       where: { slug: company.slug },
-      update: {},
+      update: { logoUrl: company.logoUrl, docTypes: company.docTypes },
       create: { ...company, categoryId: panels.id },
     });
   }
@@ -335,7 +335,7 @@ async function main() {
   for (const company of inverterCompanies) {
     await prisma.company.upsert({
       where: { slug: company.slug },
-      update: {},
+      update: { logoUrl: company.logoUrl, docTypes: company.docTypes },
       create: { ...company, categoryId: inverters.id },
     });
   }
