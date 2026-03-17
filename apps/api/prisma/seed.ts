@@ -45,7 +45,7 @@ async function main() {
       icon: "⚡",
       color: "#006297",
       logoUrl:
-        "https://i.ibb.co/vvHCyg7f/Unity-Logo-White.png",
+        "https://i.ibb.co/Dsj1LM1/Whats-App-Image-2026-03-16-at-3-56-12-PM.jpg",
       websiteUrl: "https://ornatesolar.com",
       docTypes: [
         "brochure",

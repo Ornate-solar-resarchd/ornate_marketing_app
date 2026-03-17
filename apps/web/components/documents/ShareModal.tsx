@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Copy, ExternalLink, CheckCircle, Link2, Share2 } from "lucide-react";
+import { X, Copy, ExternalLink, CheckCircle, Link2, Share2, Mail, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
@@ -42,6 +42,17 @@ export default function ShareModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleWhatsApp = () => {
+    const text = encodeURIComponent(`Check out this file: ${documentName}\n${shareUrl}`);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(`Shared File: ${documentName}`);
+    const body = encodeURIComponent(`Hi,\n\nI'm sharing a file with you: ${documentName}\n\nView/Download here: ${shareUrl}\n\nThis link expires in 24 hours.`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="mx-4 w-full max-w-md rounded-2xl bg-white shadow-2xl animate-scale-in">
@@ -75,8 +86,48 @@ export default function ShareModal({
             </div>
           ) : (
             <div className="animate-fade-in-up">
-              {/* Share URL */}
+              {/* Share via buttons */}
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Share via
+              </label>
+              <div className="mt-2 grid grid-cols-3 gap-3">
+                <button
+                  onClick={handleWhatsApp}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-border/50 p-4 transition-all hover:border-green-400 hover:bg-green-50 hover:scale-105 active:scale-95"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25D366]">
+                    <MessageCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">WhatsApp</span>
+                </button>
+                <button
+                  onClick={handleEmail}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-border/50 p-4 transition-all hover:border-blue-400 hover:bg-blue-50 hover:scale-105 active:scale-95"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EA4335]">
+                    <Mail className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Email</span>
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-border/50 p-4 transition-all hover:border-[#E8611A] hover:bg-orange-50 hover:scale-105 active:scale-95"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E8611A]">
+                    {copied ? (
+                      <CheckCircle className="h-5 w-5 text-white" />
+                    ) : (
+                      <Link2 className="h-5 w-5 text-white" />
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">
+                    {copied ? "Copied!" : "Copy Link"}
+                  </span>
+                </button>
+              </div>
+
+              {/* Share URL */}
+              <label className="mt-5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Share Link
               </label>
               <div className="mt-2 flex items-center gap-2">
@@ -105,11 +156,11 @@ export default function ShareModal({
               </div>
 
               {/* QR Code */}
-              <div className="mt-6 flex justify-center">
+              <div className="mt-5 flex justify-center">
                 <div className="rounded-2xl border border-border/50 bg-white p-4 shadow-sm">
                   <QRCodeSVG
                     value={shareUrl}
-                    size={160}
+                    size={140}
                     fgColor="#1A1A1A"
                     includeMargin
                   />
@@ -117,7 +168,7 @@ export default function ShareModal({
               </div>
 
               {/* Open in new tab */}
-              <div className="mt-5 flex justify-center">
+              <div className="mt-4 flex justify-center">
                 <Button
                   variant="outline"
                   size="sm"
@@ -130,7 +181,7 @@ export default function ShareModal({
               </div>
 
               {/* Expiry notice */}
-              <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-center">
+              <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-center">
                 <p className="text-xs font-medium text-amber-700">
                   This link expires in 24 hours
                   {expiresAt && (
