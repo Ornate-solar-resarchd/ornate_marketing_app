@@ -32,13 +32,21 @@ export async function authMiddleware(
 
     const token = authHeader.split(" ")[1];
 
-    // Build a minimal Web Request for Clerk
-    const url = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+    // Use X-Forwarded-Proto from nginx to get correct protocol
+    const proto = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.get("host");
+    const url = `${proto}://${host}${req.originalUrl}`;
     const webRequest = new globalThis.Request(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const requestState = await clerkClient.authenticateRequest(webRequest);
+    const requestState = await clerkClient.authenticateRequest(webRequest, {
+      authorizedParties: [
+        "https://ornate-marketing-app-web.vercel.app",
+        "http://localhost:3000",
+        process.env.FRONTEND_URL || "",
+      ].filter(Boolean),
+    });
     const userId = requestState.toAuth()?.userId;
 
     if (!userId) {
