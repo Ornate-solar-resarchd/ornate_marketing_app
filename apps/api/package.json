@@ -9,7 +9,10 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
@@ -32,8 +35,12 @@
     "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
     "prisma": "^5.20.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

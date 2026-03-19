@@ -6,14 +6,14 @@ export const DOC_TYPES = {
   images: {
     label: "Images",
     icon: "🖼️",
-    accept: ".jpg,.jpeg,.png,.webp,.svg",
+    accept: ".jpg,.jpeg,.png,.webp,.svg,.pdf,.gif",
   },
-  videos: { label: "Videos", icon: "🎬", accept: ".mp4,.mov,.avi" },
+  videos: { label: "Videos", icon: "🎬", accept: ".mp4,.mov,.avi,.webm,.mkv,.url,.lnk" },
   ppt: { label: "PPT / Deck", icon: "📽️", accept: ".pptx,.ppt,.pdf" },
   email: {
     label: "Email Template",
     icon: "✉️",
-    accept: ".html,.pdf,.docx,.eml,.jpg,.jpeg,.png",
+    accept: ".html,.pdf,.docx,.eml,.jpg,.jpeg,.png,.gif,.mp4,.mov",
   },
   compliance: { label: "Compliance Docs", icon: "🛡️", accept: ".pdf,.docx" },
   casestudy: {
