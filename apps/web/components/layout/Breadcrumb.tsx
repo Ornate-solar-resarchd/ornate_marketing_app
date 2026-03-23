@@ -6,6 +6,9 @@ import { ChevronRight, Home } from "lucide-react";
 
 const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
+  "about-ornate-solar": "About Ornate Solar",
+  unityess: "UnityESS",
+  "ornate-inroof": "Ornate Inroof",
   "ornate-products": "Ornate Solar Products",
   panels: "Panels",
   inverters: "Inverters",

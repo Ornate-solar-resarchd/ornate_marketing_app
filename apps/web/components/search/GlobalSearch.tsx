@@ -119,6 +119,9 @@ export default function GlobalSearch() {
               className="rounded-lg border border-border/50 bg-white px-2 py-1 text-xs transition-all hover:border-[#E8611A]/30 focus:border-[#E8611A] focus:outline-none"
             >
               <option value="">All Categories</option>
+              <option value="about-ornate-solar">About Ornate Solar</option>
+              <option value="unityess">UnityESS</option>
+              <option value="ornate-inroof">Ornate Inroof</option>
               <option value="ornate-products">Ornate Products</option>
               <option value="panels">Panels</option>
               <option value="inverters">Inverters</option>

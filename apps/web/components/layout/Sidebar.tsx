@@ -12,16 +12,22 @@ import {
   Menu,
   X,
   ChevronRight,
+  Building2,
+  BatteryCharging,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { Role } from "@ornate/types";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Ornate Products", href: "/dashboard/ornate-products", icon: Sun },
-  { label: "Panels", href: "/dashboard/panels", icon: PanelTop },
-  { label: "Inverters", href: "/dashboard/inverters", icon: Zap },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main" },
+  { label: "About Ornate Solar", href: "/dashboard/about-ornate-solar", icon: Building2, section: "ornate" },
+  { label: "UnityESS", href: "/dashboard/unityess", icon: BatteryCharging, section: "ornate" },
+  { label: "Ornate Inroof", href: "/dashboard/ornate-inroof", icon: Home, section: "ornate" },
+  { label: "Ornate Products", href: "/dashboard/ornate-products", icon: Sun, section: "categories" },
+  { label: "Panels", href: "/dashboard/panels", icon: PanelTop, section: "categories" },
+  { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
 ];
 
 export default function Sidebar() {
@@ -34,6 +40,40 @@ export default function Sidebar() {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   };
+
+  const ornateItems = navItems.filter((i) => i.section === "ornate");
+  const categoryItems = navItems.filter((i) => i.section === "categories");
+  const dashboardItem = navItems.find((i) => i.section === "main")!;
+
+  const renderNavItem = (item: typeof navItems[0], index: number) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      onClick={() => setMobileOpen(false)}
+      className={cn(
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+        isActive(item.href)
+          ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF5F0] text-[#E8611A] shadow-sm"
+          : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+      )}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <div
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
+          isActive(item.href)
+            ? "bg-[#E8611A] text-white shadow-md shadow-orange-200"
+            : "bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
+        )}
+      >
+        <item.icon className="h-4 w-4" />
+      </div>
+      <span className="flex-1">{item.label}</span>
+      {isActive(item.href) && (
+        <ChevronRight className="h-4 w-4 text-[#E8611A]/60" />
+      )}
+    </Link>
+  );
 
   const sidebarContent = (
     <>
@@ -51,39 +91,34 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Navigation
-        </p>
-        {navItems.map((item, index) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setMobileOpen(false)}
-            className={cn(
-              "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              isActive(item.href)
-                ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF5F0] text-[#E8611A] shadow-sm"
-                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-            )}
-            style={{ animationDelay: `${index * 50}ms` }}
-          >
-            <div
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
-                isActive(item.href)
-                  ? "bg-[#E8611A] text-white shadow-md shadow-orange-200"
-                  : "bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-            </div>
-            <span className="flex-1">{item.label}</span>
-            {isActive(item.href) && (
-              <ChevronRight className="h-4 w-4 text-[#E8611A]/60" />
-            )}
-          </Link>
-        ))}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {/* Main */}
+        <div>
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Navigation
+          </p>
+          {renderNavItem(dashboardItem, 0)}
+        </div>
+
+        {/* Ornate Solar Section */}
+        <div>
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Ornate Solar
+          </p>
+          <div className="space-y-1">
+            {ornateItems.map((item, i) => renderNavItem(item, i + 1))}
+          </div>
+        </div>
+
+        {/* Partners / Categories */}
+        <div>
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Partners
+          </p>
+          <div className="space-y-1">
+            {categoryItems.map((item, i) => renderNavItem(item, i + 4))}
+          </div>
+        </div>
       </nav>
 
       {/* Admin Link */}
