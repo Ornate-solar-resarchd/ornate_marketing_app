@@ -6,7 +6,7 @@ import { Bell } from "lucide-react";
 
 export default function Topbar() {
   return (
-    <header className="flex h-[60px] items-center border-b-[3px] border-[#E8611A] bg-white/95 backdrop-blur-sm px-6 animate-fade-in-down">
+    <header className="relative z-40 flex h-[60px] items-center border-b-[3px] border-[#E8611A] bg-white/95 backdrop-blur-sm px-6 animate-fade-in-down">
       {/* Left: Page title area */}
       <div className="flex-1" />
 

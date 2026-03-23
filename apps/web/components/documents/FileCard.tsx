@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Download, Share2, Trash2, FileText, Image, Film, Play } from "lucide-react";
+import { Eye, Download, Share2, Trash2, FileText, Image, Film, Play, FileSpreadsheet, Presentation, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/utils";
 import PermissionGate from "@/components/rbac/PermissionGate";
@@ -20,22 +20,24 @@ interface FileCardProps {
   onDelete: (id: string) => void;
 }
 
-function getFileIcon(mimeType: string) {
+function getFileIcon(mimeType: string, ext: string) {
   if (mimeType.startsWith("image/")) return Image;
   if (mimeType.startsWith("video/")) return Film;
+  if (["pptx", "ppt"].includes(ext)) return Presentation;
+  if (["xlsx", "xls", "csv"].includes(ext)) return FileSpreadsheet;
+  if (["html", "eml"].includes(ext)) return Mail;
   return FileText;
 }
 
-function getFileColor(mimeType: string) {
-  if (mimeType.startsWith("image/")) return { gradient: "from-purple-500 to-pink-500", bg: "bg-purple-50", text: "text-purple-600" };
-  if (mimeType.startsWith("video/")) return { gradient: "from-blue-500 to-cyan-500", bg: "bg-blue-50", text: "text-blue-600" };
-  if (mimeType === "application/pdf") return { gradient: "from-red-500 to-rose-500", bg: "bg-red-50", text: "text-red-600" };
-  return { gradient: "from-[#E8611A] to-[#FF8A50]", bg: "bg-orange-50", text: "text-[#E8611A]" };
-}
-
-function getExtBadge(originalName: string) {
-  const ext = originalName.split(".").pop()?.toUpperCase() || "";
-  return ext;
+function getFileColor(mimeType: string, ext: string) {
+  if (mimeType.startsWith("image/")) return { gradient: "from-purple-500 to-pink-500", ring: "ring-purple-200" };
+  if (mimeType.startsWith("video/")) return { gradient: "from-blue-500 to-cyan-500", ring: "ring-blue-200" };
+  if (mimeType === "application/pdf" || ext === "pdf") return { gradient: "from-red-500 to-rose-500", ring: "ring-red-200" };
+  if (["pptx", "ppt"].includes(ext)) return { gradient: "from-orange-500 to-amber-500", ring: "ring-orange-200" };
+  if (["xlsx", "xls", "csv"].includes(ext)) return { gradient: "from-emerald-500 to-green-500", ring: "ring-emerald-200" };
+  if (["docx", "doc"].includes(ext)) return { gradient: "from-blue-600 to-indigo-500", ring: "ring-blue-200" };
+  if (["html", "eml"].includes(ext)) return { gradient: "from-pink-500 to-rose-500", ring: "ring-pink-200" };
+  return { gradient: "from-[#E8611A] to-[#FF8A50]", ring: "ring-orange-200" };
 }
 
 export default function FileCard({
@@ -51,55 +53,101 @@ export default function FileCard({
   onShare,
   onDelete,
 }: FileCardProps) {
-  const Icon = getFileIcon(mimeType);
-  const colors = getFileColor(mimeType);
-  const ext = getExtBadge(originalName);
+  const ext = originalName.split(".").pop()?.toLowerCase() || "";
+  const Icon = getFileIcon(mimeType, ext);
+  const colors = getFileColor(mimeType, ext);
   const isImage = mimeType.startsWith("image/");
+  const isPdf = mimeType === "application/pdf" || ext === "pdf";
   const isVideo = mimeType.startsWith("video/");
   const [imgError, setImgError] = useState(false);
 
-  return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-      {/* Thumbnail / Preview area */}
-      <div
-        className="relative cursor-pointer overflow-hidden bg-muted/20"
-        onClick={() => onView(id)}
-      >
-        {isImage && fileUrl && !imgError ? (
-          <div className="relative h-40 w-full overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={fileUrl}
-              alt={name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-              onError={() => setImgError(true)}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
-                <Eye className="h-5 w-5 text-[#E8611A]" />
-              </div>
+  const renderThumbnail = () => {
+    // Image thumbnail
+    if (isImage && fileUrl && !imgError) {
+      return (
+        <div className="relative h-40 w-full overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fileUrl}
+            alt={name}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            onError={() => setImgError(true)}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg backdrop-blur-sm">
+              <Eye className="h-5 w-5 text-[#E8611A]" />
             </div>
           </div>
-        ) : isVideo ? (
-          <div className="relative flex h-32 w-full items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-white/30">
+        </div>
+      );
+    }
+
+    // PDF thumbnail - embedded preview
+    if (isPdf && fileUrl) {
+      return (
+        <div className="relative h-40 w-full overflow-hidden bg-white">
+          <iframe
+            src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`}
+            className="h-[200%] w-[200%] origin-top-left scale-50 pointer-events-none"
+            title={name}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg backdrop-blur-sm">
+              <Eye className="h-5 w-5 text-red-500" />
+            </div>
+          </div>
+          <div className="absolute top-2 left-2 rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+            PDF
+          </div>
+        </div>
+      );
+    }
+
+    // Video thumbnail
+    if (isVideo && fileUrl) {
+      return (
+        <div className="relative h-36 w-full overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800">
+          <video
+            src={fileUrl}
+            className="h-full w-full object-cover opacity-70"
+            preload="metadata"
+            muted
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-white/30 shadow-lg">
               <Play className="h-6 w-6 text-white ml-0.5" />
             </div>
-            <div className="absolute bottom-2 right-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
-              {ext}
-            </div>
           </div>
-        ) : (
-          <div className="flex h-28 w-full items-center justify-center bg-gradient-to-br from-muted/30 to-muted/10">
-            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${colors.gradient} shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
-              <Icon className="h-7 w-7 text-white" />
-            </div>
-            <div className="absolute bottom-2 right-2 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-              {ext}
-            </div>
+          <div className="absolute top-2 left-2 rounded-md bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+            {ext.toUpperCase()}
           </div>
-        )}
+        </div>
+      );
+    }
+
+    // Default icon thumbnail for other file types
+    return (
+      <div className="relative flex h-32 w-full items-center justify-center bg-gradient-to-br from-muted/40 to-muted/10">
+        <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${colors.gradient} shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl`}>
+          <Icon className="h-8 w-8 text-white" />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-0 bg-black/5" />
+        </div>
+        <div className={`absolute top-2 left-2 rounded-md bg-gradient-to-r ${colors.gradient} px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm`}>
+          {ext.toUpperCase()}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+      {/* Thumbnail */}
+      <div className="cursor-pointer" onClick={() => onView(id)}>
+        {renderThumbnail()}
       </div>
 
       {/* File info */}

@@ -152,8 +152,20 @@ export async function getDocumentsByCompany(companyId: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  const grouped: Record<string, typeof documents> = {};
-  for (const doc of documents) {
+  // Generate short-lived signed URLs for thumbnails
+  const docsWithUrls = await Promise.all(
+    documents.map(async (doc) => {
+      try {
+        const thumbnailUrl = await getSignedViewUrl(doc.fileKey, 3600);
+        return { ...doc, fileUrl: thumbnailUrl };
+      } catch {
+        return doc;
+      }
+    })
+  );
+
+  const grouped: Record<string, typeof docsWithUrls> = {};
+  for (const doc of docsWithUrls) {
     if (!grouped[doc.docType]) {
       grouped[doc.docType] = [];
     }

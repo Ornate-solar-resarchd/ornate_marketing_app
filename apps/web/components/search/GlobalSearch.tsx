@@ -85,7 +85,7 @@ export default function GlobalSearch() {
   }, [query, categoryFilter, docTypeFilter]);
 
   return (
-    <div ref={ref} className="relative w-full">
+    <div ref={ref} className="relative w-full z-[60]">
       <div className="relative group">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-[#E8611A]" />
         <Input
@@ -108,37 +108,35 @@ export default function GlobalSearch() {
         )}
       </div>
 
-      {/* Filter chips */}
-      {open && (
-        <div className="mt-2 flex gap-2 animate-fade-in">
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-lg border border-border/50 bg-white px-2.5 py-1.5 text-xs transition-all hover:border-[#E8611A]/30 focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
-          >
-            <option value="">All Categories</option>
-            <option value="ornate-products">Ornate Products</option>
-            <option value="panels">Panels</option>
-            <option value="inverters">Inverters</option>
-          </select>
-          <select
-            value={docTypeFilter}
-            onChange={(e) => setDocTypeFilter(e.target.value)}
-            className="rounded-lg border border-border/50 bg-white px-2.5 py-1.5 text-xs transition-all hover:border-[#E8611A]/30 focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
-          >
-            <option value="">All Types</option>
-            {Object.entries(DOC_TYPES).map(([key, val]) => (
-              <option key={key} value={key}>
-                {val.icon} {val.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Results dropdown */}
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-2 max-h-96 overflow-auto rounded-2xl border border-border/50 bg-white shadow-xl animate-fade-in-up">
+        <div className="absolute left-0 right-0 z-[70] mt-1 rounded-2xl border border-border/50 bg-white shadow-2xl animate-fade-in-up overflow-hidden">
+          {/* Filter chips inside dropdown */}
+          <div className="flex gap-2 px-3 py-2.5 border-b border-border/30 bg-muted/20">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="rounded-lg border border-border/50 bg-white px-2 py-1 text-xs transition-all hover:border-[#E8611A]/30 focus:border-[#E8611A] focus:outline-none"
+            >
+              <option value="">All Categories</option>
+              <option value="ornate-products">Ornate Products</option>
+              <option value="panels">Panels</option>
+              <option value="inverters">Inverters</option>
+            </select>
+            <select
+              value={docTypeFilter}
+              onChange={(e) => setDocTypeFilter(e.target.value)}
+              className="rounded-lg border border-border/50 bg-white px-2 py-1 text-xs transition-all hover:border-[#E8611A]/30 focus:border-[#E8611A] focus:outline-none"
+            >
+              <option value="">All Types</option>
+              {Object.entries(DOC_TYPES).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val.icon} {val.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="max-h-80 overflow-auto">
           {loading ? (
             <div className="flex items-center justify-center gap-2 p-6">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#E8611A] border-t-transparent" />
@@ -200,6 +198,7 @@ export default function GlobalSearch() {
               ))}
             </>
           )}
+          </div>
         </div>
       )}
     </div>
