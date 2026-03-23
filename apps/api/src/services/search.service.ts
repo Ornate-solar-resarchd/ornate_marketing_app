@@ -84,6 +84,7 @@ export async function searchDocuments(params: SearchParams) {
           slug: doc.company.slug,
           label: doc.company.label,
           logoUrl: doc.company.logoUrl,
+          categorySlug: doc.company.category.slug,
           categoryLabel: doc.company.category.label,
         },
         documents: [],

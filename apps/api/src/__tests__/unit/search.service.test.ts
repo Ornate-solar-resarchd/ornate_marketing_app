@@ -145,6 +145,7 @@ describe("Search Service", () => {
     expect(company.id).toBe("company_1");
     expect(company.slug).toBe("bess");
     expect(company.label).toBe("UnityESS");
+    expect(company.categorySlug).toBe("ornate-products");
     expect(company.categoryLabel).toBe("Ornate Solar Products");
   });
 });

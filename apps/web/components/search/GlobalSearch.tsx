@@ -15,6 +15,7 @@ interface SearchResult {
     slug: string;
     label: string;
     logoUrl: string;
+    categorySlug: string;
     categoryLabel: string;
   };
   documents: Array<{
@@ -176,7 +177,8 @@ export default function GlobalSearch() {
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-orange-50/50"
                       onClick={() => {
                         setOpen(false);
-                        router.push(`/dashboard/${group.company.slug}`);
+                        setQuery("");
+                        router.push(`/dashboard/${group.company.categorySlug}/${group.company.slug}`);
                       }}
                     >
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#E8611A] to-[#FF8A50]">
