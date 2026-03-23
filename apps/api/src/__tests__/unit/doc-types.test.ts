@@ -35,9 +35,10 @@ describe("DOC_TYPES Registry", () => {
     }
   });
 
-  it("brochure should accept PDF and DOCX", () => {
+  it("brochure should accept PDF, DOCX, and video", () => {
     expect(DOC_TYPES.brochure.accept).toContain(".pdf");
     expect(DOC_TYPES.brochure.accept).toContain(".docx");
+    expect(DOC_TYPES.brochure.accept).toContain(".mp4");
   });
 
   it("images should accept common image formats, PDF, and GIF", () => {

@@ -1,43 +1,43 @@
 import { z } from "zod";
 
 export const DOC_TYPES = {
-  brochure: { label: "Brochure", icon: "📖", accept: ".pdf,.docx" },
-  datasheet: { label: "Datasheet", icon: "📊", accept: ".pdf,.xlsx,.docx" },
+  brochure: { label: "Brochure", icon: "📖", accept: ".pdf,.docx,.mp4,.mov,.avi,.webm" },
+  datasheet: { label: "Datasheet", icon: "📊", accept: ".pdf,.xlsx,.docx,.mp4,.mov,.avi,.webm" },
   images: {
     label: "Images",
     icon: "🖼️",
-    accept: ".jpg,.jpeg,.png,.webp,.svg,.pdf,.gif",
+    accept: ".jpg,.jpeg,.png,.webp,.svg,.pdf,.gif,.mp4,.mov,.avi,.webm",
   },
   videos: { label: "Videos", icon: "🎬", accept: ".mp4,.mov,.avi,.webm,.mkv,.url,.lnk" },
-  ppt: { label: "PPT / Deck", icon: "📽️", accept: ".pptx,.ppt,.pdf" },
+  ppt: { label: "PPT / Deck", icon: "📽️", accept: ".pptx,.ppt,.pdf,.mp4,.mov,.avi,.webm" },
   email: {
     label: "Email Template",
     icon: "✉️",
-    accept: ".html,.pdf,.docx,.eml,.jpg,.jpeg,.png,.gif,.mp4,.mov",
+    accept: ".html,.pdf,.docx,.eml,.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.webm",
   },
-  compliance: { label: "Compliance Docs", icon: "🛡️", accept: ".pdf,.docx" },
+  compliance: { label: "Compliance Docs", icon: "🛡️", accept: ".pdf,.docx,.mp4,.mov,.avi,.webm" },
   casestudy: {
     label: "Case Studies",
     icon: "📋",
-    accept: ".pdf,.docx,.pptx",
+    accept: ".pdf,.docx,.pptx,.mp4,.mov,.avi,.webm",
   },
   installation: {
     label: "Installation Guide",
     icon: "🔧",
-    accept: ".pdf,.docx",
+    accept: ".pdf,.docx,.mp4,.mov,.avi,.webm",
   },
-  warranty: { label: "Warranty Docs", icon: "📜", accept: ".pdf,.docx" },
+  warranty: { label: "Warranty Docs", icon: "📜", accept: ".pdf,.docx,.mp4,.mov,.avi,.webm" },
   pricing: {
     label: "Pricing Sheets",
     icon: "💰",
-    accept: ".pdf,.xlsx,.docx",
+    accept: ".pdf,.xlsx,.docx,.mp4,.mov,.avi,.webm",
   },
-  approval: { label: "Type Approvals", icon: "✅", accept: ".pdf,.docx" },
-  scheme: { label: "Scheme Docs", icon: "📜", accept: ".pdf,.docx" },
+  approval: { label: "Type Approvals", icon: "✅", accept: ".pdf,.docx,.mp4,.mov,.avi,.webm" },
+  scheme: { label: "Scheme Docs", icon: "📜", accept: ".pdf,.docx,.mp4,.mov,.avi,.webm" },
   structural: {
     label: "Structural Docs",
     icon: "🔩",
-    accept: ".pdf,.docx,.dwg",
+    accept: ".pdf,.docx,.dwg,.mp4,.mov,.avi,.webm",
   },
 } as const;
 
