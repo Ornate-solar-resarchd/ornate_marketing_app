@@ -9,6 +9,7 @@ interface Document {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  fileUrl?: string;
 }
 
 interface FileGridProps {
@@ -41,7 +42,7 @@ export default function FileGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {documents.map((doc) => (
         <FileCard
           key={doc.id}

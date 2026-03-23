@@ -6,9 +6,17 @@ import { Bell } from "lucide-react";
 
 export default function Topbar() {
   return (
-    <header className="flex h-[60px] items-center justify-between border-b-[3px] border-[#E8611A] bg-white/95 backdrop-blur-sm px-6 animate-fade-in-down">
-      <GlobalSearch />
-      <div className="ml-4 flex items-center gap-3">
+    <header className="flex h-[60px] items-center border-b-[3px] border-[#E8611A] bg-white/95 backdrop-blur-sm px-6 animate-fade-in-down">
+      {/* Left: Page title area */}
+      <div className="flex-1" />
+
+      {/* Center: Search bar - compact */}
+      <div className="w-full max-w-md mx-4">
+        <GlobalSearch />
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-3 flex-shrink-0">
         <button className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:scale-105 active:scale-95">
           <Bell className="h-4 w-4" />
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#E8611A] text-[9px] font-bold text-white">

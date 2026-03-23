@@ -12,6 +12,7 @@ interface Document {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  fileUrl?: string;
 }
 
 interface FileListProps {
@@ -62,9 +63,16 @@ export default function FileList({
             const Icon = getFileIcon(doc.mimeType);
             return (
               <tr key={doc.id} className="border-b border-border last:border-0">
-                <td className="flex items-center gap-2 py-3 pr-4">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate font-medium">{doc.name}</span>
+                <td className="py-3 pr-4">
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => onView(doc.id)}>
+                    {doc.mimeType.startsWith("image/") && doc.fileUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={doc.fileUrl} alt="" className="h-8 w-8 rounded-md object-cover ring-1 ring-border/50" />
+                    ) : (
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="truncate font-medium hover:text-[#E8611A] transition-colors">{doc.name}</span>
+                  </div>
                 </td>
                 <td className="py-3 pr-4 text-muted-foreground">
                   {formatBytes(doc.sizeBytes)}

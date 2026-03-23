@@ -17,6 +17,7 @@ interface Document {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  fileUrl?: string;
 }
 
 interface DocSectionProps {

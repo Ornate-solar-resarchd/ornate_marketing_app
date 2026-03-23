@@ -36,6 +36,7 @@ interface DocumentData {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  fileUrl?: string;
 }
 
 export default function CompanyDetailPage() {

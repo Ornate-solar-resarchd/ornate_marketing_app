@@ -85,12 +85,12 @@ export default function GlobalSearch() {
   }, [query, categoryFilter, docTypeFilter]);
 
   return (
-    <div ref={ref} className="relative w-full max-w-lg">
+    <div ref={ref} className="relative w-full">
       <div className="relative group">
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-[#E8611A]" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-[#E8611A]" />
         <Input
-          placeholder="Search collateral..."
-          className="pl-10 pr-8 rounded-xl border-border/50 bg-muted/30 transition-all focus:bg-white focus:shadow-md focus:border-[#E8611A]/30 focus:ring-1 focus:ring-[#E8611A]/10"
+          placeholder="Search files, companies..."
+          className="h-9 pl-9 pr-8 rounded-xl border-border/50 bg-muted/30 text-sm transition-all focus:bg-white focus:shadow-md focus:border-[#E8611A]/30 focus:ring-1 focus:ring-[#E8611A]/10"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setOpen(true)}
