@@ -127,6 +127,7 @@ async function main() {
         "brochure",
         "datasheet",
         "images",
+        "videos",
         "installation",
         "ppt",
         "email",
@@ -143,7 +144,7 @@ async function main() {
       color: "#16A34A",
       logoUrl: "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
       websiteUrl: "https://ornatesolar.com",
-      docTypes: ["brochure", "datasheet", "images", "scheme", "ppt", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "scheme", "ppt", "email"],
     },
     {
       slug: "ornateassured",
@@ -152,7 +153,7 @@ async function main() {
       color: "#7C3AED",
       logoUrl: "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
       websiteUrl: "https://ornatesolar.com",
-      docTypes: ["brochure", "images", "warranty", "ppt", "email", "casestudy"],
+      docTypes: ["brochure", "images", "videos", "warranty", "ppt", "email", "casestudy"],
     },
     {
       slug: "ojas",
@@ -161,7 +162,7 @@ async function main() {
       color: "#B45309",
       logoUrl: "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
       websiteUrl: "https://ornatesolar.com",
-      docTypes: ["brochure", "datasheet", "images", "structural", "ppt", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "structural", "ppt", "email"],
     },
     {
       slug: "agripv",
@@ -179,7 +180,7 @@ async function main() {
       color: "#0369A1",
       logoUrl: "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
       websiteUrl: "https://ornatesolar.com",
-      docTypes: ["brochure", "datasheet", "images", "structural", "casestudy", "ppt", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "structural", "casestudy", "ppt", "email"],
     },
   ];
 
@@ -192,7 +193,7 @@ async function main() {
       color: "#F59E0B",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2025/11/First-Solar-Logo.png",
       websiteUrl: "https://www.firstsolar.com",
-      docTypes: ["brochure", "datasheet", "images", "warranty", "ppt", "pricing"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "warranty", "ppt", "pricing"],
     },
     {
       slug: "renewsys",
@@ -201,7 +202,7 @@ async function main() {
       color: "#DC2626",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2020/08/Renewsys-Logo.png",
       websiteUrl: "https://www.renewsys.com",
-      docTypes: ["brochure", "datasheet", "images", "warranty", "ppt", "pricing", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "warranty", "ppt", "pricing", "email"],
     },
     {
       slug: "canadiansolar",
@@ -210,7 +211,7 @@ async function main() {
       color: "#991B1B",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2020/09/Canadian-Solar-India.png",
       websiteUrl: "https://www.canadiansolar.com",
-      docTypes: ["brochure", "datasheet", "images", "warranty", "ppt", "pricing", "compliance"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "warranty", "ppt", "pricing", "compliance"],
     },
   ];
 
@@ -232,7 +233,7 @@ async function main() {
       color: "#1D4ED8",
       logoUrl: "https://i.ibb.co/0yVq9ZkF/Whats-App-Image-2026-03-17-at-12-46-01-PM.jpg",
       websiteUrl: "https://www.solaredge.com",
-      docTypes: ["brochure", "datasheet", "images", "installation", "approval", "ppt", "pricing"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "installation", "approval", "ppt", "pricing"],
     },
     {
       slug: "enphase",
@@ -241,7 +242,7 @@ async function main() {
       color: "#D97706",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2020/08/Enphase-LOgo.png",
       websiteUrl: "https://www.enphase.com",
-      docTypes: ["brochure", "datasheet", "images", "installation", "approval", "ppt", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "installation", "approval", "ppt", "email"],
     },
     {
       slug: "fronius",
@@ -250,7 +251,7 @@ async function main() {
       color: "#C2410C",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2020/08/Fronius-Logo.png",
       websiteUrl: "https://www.fronius.com",
-      docTypes: ["brochure", "datasheet", "images", "installation", "approval", "ppt", "pricing"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "installation", "approval", "ppt", "pricing"],
     },
     {
       slug: "havells",
@@ -259,7 +260,7 @@ async function main() {
       color: "#7E22CE",
       logoUrl: "https://ornatesolar.com/wp-content/uploads/2022/04/Havells-Solar.webp",
       websiteUrl: "https://www.havells.com",
-      docTypes: ["brochure", "datasheet", "images", "approval", "ppt", "pricing", "email"],
+      docTypes: ["brochure", "datasheet", "images", "videos", "approval", "ppt", "pricing", "email"],
     },
   ];
 
