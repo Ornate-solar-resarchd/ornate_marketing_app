@@ -43,6 +43,7 @@ model Document {
   mimeType     String
   sizeBytes    Int
   docType      String
+  tags         String[]  @default([])
   companyId    String
   company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   uploadedBy   String

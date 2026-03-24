@@ -29,6 +29,8 @@ export async function searchDocuments(params: SearchParams) {
           { name: { contains: q, mode: "insensitive" } },
           { originalName: { contains: q, mode: "insensitive" } },
           { company: { label: { contains: q, mode: "insensitive" } } },
+          { tags: { has: q } },
+          { tags: { hasSome: q.split(" ").filter(Boolean) } },
         ],
       },
       ...(category

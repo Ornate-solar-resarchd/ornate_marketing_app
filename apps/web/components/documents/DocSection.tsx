@@ -18,6 +18,7 @@ interface Document {
   sizeBytes: number;
   createdAt: string;
   fileUrl?: string;
+  tags?: string[];
 }
 
 interface DocSectionProps {

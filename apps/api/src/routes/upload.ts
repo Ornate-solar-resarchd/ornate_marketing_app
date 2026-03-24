@@ -24,7 +24,8 @@ router.post(
   upload.array("files", 10),
   async (req, res) => {
     try {
-      const { companyId, docType } = req.body;
+      const { companyId, docType, customName, tags: tagsRaw } = req.body;
+      const tags: string[] = tagsRaw ? (typeof tagsRaw === "string" ? JSON.parse(tagsRaw) : tagsRaw) : [];
 
       if (!companyId || !docType) {
         res.status(400).json({
@@ -74,7 +75,7 @@ router.post(
       const uploaderName = req.user!.userId;
 
       const results = await Promise.all(
-        files.map((file) =>
+        files.map((file, index) =>
           uploadDocument({
             buffer: file.buffer,
             originalName: file.originalname,
@@ -84,6 +85,8 @@ router.post(
             docType,
             uploadedBy: req.user!.userId,
             uploaderName,
+            customName: files.length === 1 && customName ? customName : undefined,
+            tags,
           })
         )
       );

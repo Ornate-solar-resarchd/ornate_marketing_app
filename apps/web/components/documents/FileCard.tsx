@@ -14,6 +14,7 @@ interface FileCardProps {
   sizeBytes: number;
   createdAt: string;
   fileUrl?: string;
+  tags?: string[];
   onView: (id: string) => void;
   onDownload: (id: string) => void;
   onShare: (id: string) => void;
@@ -48,6 +49,7 @@ export default function FileCard({
   sizeBytes,
   createdAt,
   fileUrl,
+  tags,
   onView,
   onDownload,
   onShare,
@@ -163,6 +165,25 @@ export default function FileCard({
           {formatBytes(sizeBytes)} &middot;{" "}
           {new Date(createdAt).toLocaleDateString()}
         </p>
+
+        {/* Tags */}
+        {tags && tags.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex rounded-md bg-[#E8611A]/8 px-1.5 py-0.5 text-[10px] font-medium text-[#E8611A]"
+              >
+                {tag}
+              </span>
+            ))}
+            {tags.length > 3 && (
+              <span className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                +{tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="mt-2.5 flex items-center gap-1 border-t border-border/30 pt-2.5">

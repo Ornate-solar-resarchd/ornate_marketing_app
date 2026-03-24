@@ -16,6 +16,8 @@ interface UploadFileParams {
   docType: string;
   uploadedBy: string;
   uploaderName: string;
+  customName?: string;
+  tags?: string[];
 }
 
 export async function uploadDocument(params: UploadFileParams) {
@@ -28,6 +30,8 @@ export async function uploadDocument(params: UploadFileParams) {
     docType,
     uploadedBy,
     uploaderName,
+    customName,
+    tags,
   } = params;
 
   const fileKey = generateS3Key(companyId, docType, originalName);
@@ -35,13 +39,14 @@ export async function uploadDocument(params: UploadFileParams) {
 
   const document = await prisma.document.create({
     data: {
-      name: originalName.replace(/\.[^/.]+$/, ""),
+      name: customName || originalName.replace(/\.[^/.]+$/, ""),
       originalName,
       fileKey,
       fileUrl,
       mimeType,
       sizeBytes,
       docType,
+      tags: tags || [],
       companyId,
       uploadedBy,
       uploaderName,

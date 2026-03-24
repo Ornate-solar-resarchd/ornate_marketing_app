@@ -37,6 +37,7 @@ interface DocumentData {
   sizeBytes: number;
   createdAt: string;
   fileUrl?: string;
+  tags?: string[];
 }
 
 export default function CompanyDetailPage() {
