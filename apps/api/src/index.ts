@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
+import { swaggerDocument } from "./swagger";
 import companiesRouter from "./routes/companies";
 import documentsRouter from "./routes/documents";
 import uploadRouter from "./routes/upload";
@@ -21,6 +23,12 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Swagger API docs
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  customCss: '.swagger-ui .topbar { background-color: #E8611A; } .swagger-ui .topbar .download-url-wrapper { display: none; }',
+  customSiteTitle: "Ornate Solar API Docs",
+}));
 
 // Health check
 app.get("/api/health", (_req, res) => {
