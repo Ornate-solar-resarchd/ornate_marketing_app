@@ -6,6 +6,7 @@ import {
   getSignedViewUrl,
 } from "./s3.service";
 import { v4 as uuidv4 } from "uuid";
+import { autoTagFile } from "./ai-tagger.service";
 
 interface UploadFileParams {
   buffer: Buffer;
@@ -37,7 +38,13 @@ export async function uploadDocument(params: UploadFileParams) {
   const fileKey = generateS3Key(companyId, docType, originalName);
   const fileUrl = await uploadToS3(buffer, fileKey, mimeType);
 
-  const displayName = customName || originalName.replace(/\.[^/.]+$/, "");
+  // AI auto-tagging (runs in parallel, doesn't block upload)
+  const aiResult = await autoTagFile(buffer, mimeType, originalName);
+
+  // Merge user-provided tags with AI tags (user tags take priority)
+  const mergedTags = [...new Set([...(tags || []), ...(aiResult?.tags || [])])];
+  const description = aiResult?.description || "";
+  const displayName = customName || aiResult?.suggestedName || originalName.replace(/\.[^/.]+$/, "");
 
   // Check for previous version — match by name (without extension) in same company+docType
   const baseName = originalName.replace(/\.[^/.]+$/, "").toLowerCase().trim();
@@ -87,7 +94,8 @@ export async function uploadDocument(params: UploadFileParams) {
       mimeType,
       sizeBytes,
       docType,
-      tags: tags || [],
+      tags: mergedTags,
+      description,
       version: newVersion,
       parentId,
       companyId,

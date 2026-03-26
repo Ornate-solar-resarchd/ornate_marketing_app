@@ -44,6 +44,7 @@ model Document {
   sizeBytes    Int
   docType      String
   tags         String[]   @default([])
+  description  String     @default("")
   version      Int        @default(1)
   parentId     String?
   parent       Document?  @relation("DocumentVersions", fields: [parentId], references: [id], onDelete: SetNull)
