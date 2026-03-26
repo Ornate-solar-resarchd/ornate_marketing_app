@@ -44,7 +44,8 @@ export async function uploadDocument(params: UploadFileParams) {
   // Merge user-provided tags with AI tags (user tags take priority)
   const mergedTags = [...new Set([...(tags || []), ...(aiResult?.tags || [])])];
   const description = aiResult?.description || "";
-  const displayName = customName || aiResult?.suggestedName || originalName.replace(/\.[^/.]+$/, "");
+  // Only use custom name if user explicitly provided one — never auto-rename from AI
+  const displayName = customName || originalName.replace(/\.[^/.]+$/, "");
 
   // Check for previous version — match by name (without extension) in same company+docType
   const baseName = originalName.replace(/\.[^/.]+$/, "").toLowerCase().trim();
