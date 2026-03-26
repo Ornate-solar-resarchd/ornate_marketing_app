@@ -11,6 +11,7 @@ import DocSection from "@/components/documents/DocSection";
 import FileViewer from "@/components/documents/FileViewer";
 import UploadModal from "@/components/documents/UploadModal";
 import ShareModal from "@/components/documents/ShareModal";
+import VersionHistory from "@/components/documents/VersionHistory";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import api from "@/lib/api";
@@ -56,6 +57,8 @@ export default function CompanyDetailPage() {
   const [uploadDocType, setUploadDocType] = useState<DocTypeKey | null>(null);
   const [shareDocId, setShareDocId] = useState<string | null>(null);
   const [shareDocName, setShareDocName] = useState("");
+  const [versionDocId, setVersionDocId] = useState<string | null>(null);
+  const [versionDocName, setVersionDocName] = useState("");
 
   const fetchData = async () => {
     try {
@@ -114,6 +117,17 @@ export default function CompanyDetailPage() {
       }
     }
     setShareDocId(docId);
+  };
+
+  const handleViewVersions = (docId: string) => {
+    for (const docs of Object.values(documents)) {
+      const doc = docs.find((d) => d.id === docId);
+      if (doc) {
+        setVersionDocName(doc.name);
+        break;
+      }
+    }
+    setVersionDocId(docId);
   };
 
   const handleDelete = async (docId: string) => {
@@ -241,6 +255,7 @@ export default function CompanyDetailPage() {
               onShare={handleShare}
               onDelete={handleDelete}
               onUpload={() => setUploadDocType(docType)}
+              onViewVersions={handleViewVersions}
             />
           );
         })}
@@ -278,6 +293,16 @@ export default function CompanyDetailPage() {
           documentId={shareDocId}
           documentName={shareDocName}
           onClose={() => setShareDocId(null)}
+        />
+      )}
+
+      {versionDocId && (
+        <VersionHistory
+          documentId={versionDocId}
+          documentName={versionDocName}
+          onClose={() => setVersionDocId(null)}
+          onView={handleView}
+          onDownload={handleDownload}
         />
       )}
     </div>

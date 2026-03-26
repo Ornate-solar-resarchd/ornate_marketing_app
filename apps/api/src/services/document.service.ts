@@ -37,9 +37,50 @@ export async function uploadDocument(params: UploadFileParams) {
   const fileKey = generateS3Key(companyId, docType, originalName);
   const fileUrl = await uploadToS3(buffer, fileKey, mimeType);
 
+  const displayName = customName || originalName.replace(/\.[^/.]+$/, "");
+
+  // Check for previous version — match by name (without extension) in same company+docType
+  const baseName = originalName.replace(/\.[^/.]+$/, "").toLowerCase().trim();
+  const existingDoc = await prisma.document.findFirst({
+    where: {
+      companyId,
+      docType,
+      OR: [
+        { name: { equals: displayName, mode: "insensitive" } },
+        { originalName: { startsWith: baseName, mode: "insensitive" } },
+      ],
+      parentId: null, // only match root documents or latest in chain
+    },
+    orderBy: { version: "desc" },
+  });
+
+  // Find the latest version in the chain
+  let parentId: string | null = null;
+  let newVersion = 1;
+
+  if (existingDoc) {
+    // Find the highest version in this document's chain
+    const latestInChain = await prisma.document.findFirst({
+      where: {
+        OR: [
+          { id: existingDoc.id },
+          { parentId: existingDoc.id },
+        ],
+        companyId,
+        docType,
+      },
+      orderBy: { version: "desc" },
+    });
+
+    if (latestInChain) {
+      parentId = existingDoc.id;
+      newVersion = latestInChain.version + 1;
+    }
+  }
+
   const document = await prisma.document.create({
     data: {
-      name: customName || originalName.replace(/\.[^/.]+$/, ""),
+      name: displayName,
       originalName,
       fileKey,
       fileUrl,
@@ -47,6 +88,8 @@ export async function uploadDocument(params: UploadFileParams) {
       sizeBytes,
       docType,
       tags: tags || [],
+      version: newVersion,
+      parentId,
       companyId,
       uploadedBy,
       uploaderName,

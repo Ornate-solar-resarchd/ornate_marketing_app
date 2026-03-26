@@ -35,7 +35,7 @@ model Company {
 }
 
 model Document {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
   originalName String
   fileKey      String
@@ -43,18 +43,23 @@ model Document {
   mimeType     String
   sizeBytes    Int
   docType      String
-  tags         String[]  @default([])
+  tags         String[]   @default([])
+  version      Int        @default(1)
+  parentId     String?
+  parent       Document?  @relation("DocumentVersions", fields: [parentId], references: [id], onDelete: SetNull)
+  versions     Document[] @relation("DocumentVersions")
   companyId    String
-  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   uploadedBy   String
   uploaderName String
-  shareToken   String?   @unique
+  shareToken   String?    @unique
   shareExpiry  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([companyId, docType])
   @@index([shareToken])
+  @@index([parentId])
 }
 
 model AuditLog {

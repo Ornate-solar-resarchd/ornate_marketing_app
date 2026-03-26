@@ -15,10 +15,13 @@ interface FileCardProps {
   createdAt: string;
   fileUrl?: string;
   tags?: string[];
+  version?: number;
+  parentId?: string | null;
   onView: (id: string) => void;
   onDownload: (id: string) => void;
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
+  onViewVersions?: (id: string) => void;
 }
 
 function getFileIcon(mimeType: string, ext: string) {
@@ -50,10 +53,13 @@ export default function FileCard({
   createdAt,
   fileUrl,
   tags,
+  version = 1,
+  parentId,
   onView,
   onDownload,
   onShare,
   onDelete,
+  onViewVersions,
 }: FileCardProps) {
   const ext = originalName.split(".").pop()?.toLowerCase() || "";
   const Icon = getFileIcon(mimeType, ext);
@@ -62,6 +68,10 @@ export default function FileCard({
   const isPdf = mimeType === "application/pdf" || ext === "pdf";
   const isVideo = mimeType.startsWith("video/");
   const [imgError, setImgError] = useState(false);
+
+  // "New" badge — files uploaded in last 7 days
+  const isNew = Date.now() - new Date(createdAt).getTime() < 7 * 24 * 60 * 60 * 1000;
+  const hasVersions = version > 1 || parentId;
 
   const renderThumbnail = () => {
     // Image thumbnail
@@ -147,6 +157,24 @@ export default function FileCard({
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+      {/* Status badges - top right */}
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+        {isNew && (
+          <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm animate-fade-in">
+            NEW
+          </span>
+        )}
+        {hasVersions && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewVersions?.(id); }}
+            className="rounded-md bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm hover:bg-blue-600 transition-colors cursor-pointer"
+            title="View version history"
+          >
+            v{version}
+          </button>
+        )}
+      </div>
+
       {/* Thumbnail */}
       <div className="cursor-pointer" onClick={() => onView(id)}>
         {renderThumbnail()}

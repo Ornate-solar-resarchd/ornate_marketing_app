@@ -50,6 +50,46 @@ router.post("/documents/:id/view-url", async (req, res) => {
   }
 });
 
+// GET /documents/:id/versions — get all versions of a document
+router.get("/documents/:id/versions", async (req, res) => {
+  try {
+    const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
+    if (!doc) {
+      res.status(404).json({ error: "Document not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    // Find the root parent
+    const rootId = doc.parentId || doc.id;
+
+    const versions = await prisma.document.findMany({
+      where: {
+        OR: [
+          { id: rootId },
+          { parentId: rootId },
+        ],
+      },
+      orderBy: { version: "desc" },
+      select: {
+        id: true,
+        name: true,
+        originalName: true,
+        version: true,
+        sizeBytes: true,
+        mimeType: true,
+        createdAt: true,
+        uploadedBy: true,
+        uploaderName: true,
+      },
+    });
+
+    res.json(versions);
+  } catch (error) {
+    logger.error("Error fetching versions:", error);
+    res.status(500).json({ error: "Failed to fetch versions", code: "FETCH_ERROR" });
+  }
+});
+
 router.delete(
   "/documents/:id",
   requirePermission("delete_own"),

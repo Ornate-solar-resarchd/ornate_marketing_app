@@ -10,6 +10,9 @@ interface Document {
   sizeBytes: number;
   createdAt: string;
   fileUrl?: string;
+  tags?: string[];
+  version?: number;
+  parentId?: string | null;
 }
 
 interface FileGridProps {
@@ -18,6 +21,7 @@ interface FileGridProps {
   onDownload: (id: string) => void;
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
+  onViewVersions?: (id: string) => void;
 }
 
 export default function FileGrid({
@@ -26,6 +30,7 @@ export default function FileGrid({
   onDownload,
   onShare,
   onDelete,
+  onViewVersions,
 }: FileGridProps) {
   if (documents.length === 0) {
     return (
@@ -51,6 +56,7 @@ export default function FileGrid({
           onDownload={onDownload}
           onShare={onShare}
           onDelete={onDelete}
+          onViewVersions={onViewVersions}
         />
       ))}
     </div>

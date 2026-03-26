@@ -29,6 +29,7 @@ interface DocSectionProps {
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
   onUpload: (docType: string) => void;
+  onViewVersions?: (id: string) => void;
 }
 
 export default function DocSection({
@@ -39,6 +40,7 @@ export default function DocSection({
   onShare,
   onDelete,
   onUpload,
+  onViewVersions,
 }: DocSectionProps) {
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -150,6 +152,7 @@ export default function DocSection({
                 onDownload={onDownload}
                 onShare={onShare}
                 onDelete={onDelete}
+                onViewVersions={onViewVersions}
               />
             ) : (
               <FileList
@@ -158,6 +161,7 @@ export default function DocSection({
                 onDownload={onDownload}
                 onShare={onShare}
                 onDelete={onDelete}
+                onViewVersions={onViewVersions}
               />
             )}
           </div>
