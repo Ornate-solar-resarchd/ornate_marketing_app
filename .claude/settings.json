@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "WebFetch(domain:knowledge-center.solaredge.com)",
+      "Read(//Users/priyankrajput/Downloads/A_Compliance_Sheets/**)",
+      "Bash(npx xlsx-cli:*)",
+      "Bash(python3 -c \":*)"
     ]
   }
 }
