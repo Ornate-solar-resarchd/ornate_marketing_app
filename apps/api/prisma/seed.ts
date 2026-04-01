@@ -182,6 +182,15 @@ async function main() {
       websiteUrl: "https://ornatesolar.com",
       docTypes: ["brochure", "datasheet", "images", "videos", "structural", "casestudy", "ppt", "email"],
     },
+    {
+      slug: "umang",
+      label: "Umang",
+      icon: "🌞",
+      color: "#D97706",
+      logoUrl: "https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png",
+      websiteUrl: "https://ornatesolar.com",
+      docTypes: ["brochure", "datasheet", "images", "videos", "ppt", "email", "compliance", "casestudy"],
+    },
   ];
 
   // Panels
