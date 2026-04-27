@@ -1,0 +1,20 @@
+name: Deploy Marketing Portal
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-marketing
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: Ornate-solar-resarchd/portals-infra/.github/workflows/_deploy-template.yml@main
+    with:
+      portal:       marketing
+      portal_dir:   ornate_marketing_app
+      services:     "marketing-api marketing-web"
+      health_url:   "https://marketing.unityess.cloud/"
+      runner_label: marketing
