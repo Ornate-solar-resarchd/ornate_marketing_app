@@ -1,12 +1,10 @@
-import { createClerkClient } from "@clerk/backend";
+import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import type { Role } from "@ornate/types";
 import { logger } from "../lib/logger";
+import { prisma } from "../lib/prisma";
 
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY!,
-  publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
-});
+const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 
 declare global {
   namespace Express {
@@ -14,9 +12,18 @@ declare global {
       user?: {
         userId: string;
         role: Role;
+        email: string;
       };
     }
   }
+}
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  role: Role;
+  iat: number;
+  exp: number;
 }
 
 export async function authMiddleware(
@@ -33,35 +40,41 @@ export async function authMiddleware(
 
     const token = authHeader.split(" ")[1];
 
-    // Use X-Forwarded-Proto from nginx to get correct protocol
-    const proto = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.get("host");
-    const url = `${proto}://${host}${req.originalUrl}`;
-    const webRequest = new globalThis.Request(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const requestState = await clerkClient.authenticateRequest(webRequest, {
-      authorizedParties: [
-        "https://ornate-marketing-app-web.vercel.app",
-        "http://localhost:3000",
-        process.env.FRONTEND_URL || "",
-      ].filter(Boolean),
-    });
-    const userId = requestState.toAuth()?.userId;
-
-    if (!userId) {
-      res.status(401).json({ error: "Invalid token", code: "UNAUTHORIZED" });
+    let payload: JwtPayload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    } catch {
+      res.status(401).json({ error: "Invalid or expired token", code: "UNAUTHORIZED" });
       return;
     }
 
-    const user = await clerkClient.users.getUser(userId);
-    const role = (user.publicMetadata?.role as Role) || "viewer";
+    // Confirm the user is still active in the DB (handles deactivation).
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+    if (!user || !user.isActive) {
+      res.status(401).json({ error: "User not found or inactive", code: "UNAUTHORIZED" });
+      return;
+    }
 
-    req.user = { userId, role };
+    req.user = {
+      userId: user.id,
+      email: user.email,
+      role: user.role as Role,
+    };
     next();
   } catch (error) {
     logger.error("Auth middleware error:", error);
     res.status(401).json({ error: "Authentication failed", code: "UNAUTHORIZED" });
   }
+}
+
+/** Helper used by the login route to issue a JWT. */
+export function signToken(user: { id: string; email: string; role: string }): string {
+  return jwt.sign(
+    { sub: user.id, email: user.email, role: user.role },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 }

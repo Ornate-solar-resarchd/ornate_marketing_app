@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createClerkClient } from "@clerk/backend";
+import bcrypt from "bcryptjs";
 import { requirePermission } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
 import { deleteFromS3 } from "../services/s3.service";
@@ -7,9 +7,6 @@ import { CreateCompanySchema, ROLES } from "@ornate/types";
 import { logger } from "../lib/logger";
 
 const router: Router = Router();
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY!,
-});
 
 // GET /api/admin/users — List all users with roles
 router.get(
@@ -17,17 +14,18 @@ router.get(
   requirePermission("manage_users"),
   async (_req, res) => {
     try {
-      const users = await clerkClient.users.getUserList({ limit: 100 });
-      const mapped = users.data.map((u) => ({
-        id: u.id,
-        email: u.emailAddresses[0]?.emailAddress || "",
-        firstName: u.firstName,
-        lastName: u.lastName,
-        imageUrl: u.imageUrl,
-        role: (u.publicMetadata?.role as string) || "viewer",
-        createdAt: u.createdAt,
-      }));
-      res.json(mapped);
+      const users = await prisma.user.findMany({
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+      res.json(users);
     } catch (error) {
       logger.error("Error listing users:", error);
       res.status(500).json({ error: "Failed to list users", code: "FETCH_ERROR" });
@@ -51,14 +49,77 @@ router.patch(
       }
 
       const userId = req.params.id as string;
-      await clerkClient.users.updateUserMetadata(userId, {
-        publicMetadata: { role },
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { role },
+        select: { id: true, email: true, role: true },
       });
 
-      res.json({ message: "Role updated", userId, role });
+      res.json({ message: "Role updated", userId: user.id, role: user.role });
     } catch (error) {
       logger.error("Error updating user role:", error);
       res.status(500).json({ error: "Failed to update role", code: "UPDATE_ERROR" });
+    }
+  }
+);
+
+// POST /api/admin/users — Create a new user (admin only)
+router.post(
+  "/admin/users",
+  requirePermission("manage_users"),
+  async (req, res) => {
+    try {
+      const { email, password, fullName, role } = req.body;
+      if (!email || !password || !fullName) {
+        res.status(400).json({
+          error: "email, password, fullName are required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+      if (role && !ROLES.includes(role)) {
+        res.status(400).json({
+          error: `Invalid role. Must be one of: ${ROLES.join(", ")}`,
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+      const passwordHash = await bcrypt.hash(password, 12);
+      const user = await prisma.user.create({
+        data: {
+          email: email.toLowerCase().trim(),
+          passwordHash,
+          fullName,
+          role: role || "viewer",
+        },
+        select: { id: true, email: true, fullName: true, role: true, isActive: true },
+      });
+      res.status(201).json(user);
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        res.status(409).json({ error: "Email already exists", code: "CONFLICT" });
+        return;
+      }
+      logger.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user", code: "CREATE_ERROR" });
+    }
+  }
+);
+
+// DELETE /api/admin/users/:id — Deactivate user (soft delete)
+router.delete(
+  "/admin/users/:id",
+  requirePermission("manage_users"),
+  async (req, res) => {
+    try {
+      await prisma.user.update({
+        where: { id: req.params.id as string },
+        data: { isActive: false },
+      });
+      res.json({ message: "User deactivated" });
+    } catch (error) {
+      logger.error("Error deactivating user:", error);
+      res.status(500).json({ error: "Failed to deactivate user", code: "DELETE_ERROR" });
     }
   }
 );

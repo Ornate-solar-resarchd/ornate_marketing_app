@@ -96,13 +96,20 @@ export default function CompanyDetailPage() {
   const handleDownload = async (docId: string) => {
     try {
       const res = await api.post(`/documents/${docId}/view-url`);
+      // Fetch the file then trigger a blob download. The blob: URL is same-origin
+      // so the `download` attribute is honored — without this the browser opens
+      // the cross-origin S3 signed URL in a new tab instead of downloading.
+      const fileRes = await fetch(res.data.signedUrl);
+      if (!fileRes.ok) throw new Error(`Fetch failed (${fileRes.status})`);
+      const blob = await fileRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = res.data.signedUrl;
+      link.href = blobUrl;
       link.download = res.data.document.originalName;
-      link.target = "_blank";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
     } catch {
       toast.error("Failed to download file");
     }
@@ -267,14 +274,22 @@ export default function CompanyDetailPage() {
           name={viewerDoc.name}
           mimeType={viewerDoc.mimeType}
           onClose={() => setViewerDoc(null)}
-          onDownload={() => {
-            const link = document.createElement("a");
-            link.href = viewerDoc.url;
-            link.download = viewerDoc.name;
-            link.target = "_blank";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+          onDownload={async () => {
+            try {
+              const fileRes = await fetch(viewerDoc.url);
+              if (!fileRes.ok) throw new Error("Fetch failed");
+              const blob = await fileRes.blob();
+              const blobUrl = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = blobUrl;
+              link.download = viewerDoc.name;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(blobUrl);
+            } catch {
+              toast.error("Failed to download file");
+            }
           }}
         />
       )}

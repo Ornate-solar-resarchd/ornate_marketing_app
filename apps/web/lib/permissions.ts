@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/auth-context";
 import { hasPermission, type Permission, type Role } from "@ornate/types";
 
 export { hasPermission, type Permission, type Role };

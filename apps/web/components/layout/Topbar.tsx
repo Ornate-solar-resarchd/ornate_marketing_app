@@ -1,6 +1,6 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
+import { UserButton } from "@/lib/auth-context";
 import GlobalSearch from "@/components/search/GlobalSearch";
 import { Bell } from "lucide-react";
 
@@ -24,14 +24,7 @@ export default function Topbar() {
           </span>
         </button>
         <div className="h-6 w-px bg-border" />
-        <UserButton
-          afterSignOutUrl="/sign-in"
-          appearance={{
-            elements: {
-              avatarBox: "h-9 w-9 ring-2 ring-border hover:ring-[#E8611A]/30 transition-all",
-            },
-          }}
-        />
+        <UserButton />
       </div>
     </header>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import CategoryCard from "@/components/dashboard/CategoryCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@/lib/auth-context";
 import api from "@/lib/api";
 import { Sparkles } from "lucide-react";
 

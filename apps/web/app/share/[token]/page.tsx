@@ -65,14 +65,22 @@ export default function SharePage() {
 
   if (!data) return null;
 
-  const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = data.signedUrl;
-    link.download = data.document.originalName;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async () => {
+    try {
+      const fileRes = await fetch(data.signedUrl);
+      if (!fileRes.ok) throw new Error(`Fetch failed (${fileRes.status})`);
+      const blob = await fileRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = data.document.originalName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
   };
 
   return (

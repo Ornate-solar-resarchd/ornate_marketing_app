@@ -1,144 +1,139 @@
-import { SignIn } from "@clerk/nextjs";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useSignIn } from "@/lib/auth-context";
 import { Sun, Zap, Shield, BarChart3 } from "lucide-react";
 
 export default function SignInPage() {
+  const router = useRouter();
+  const { signIn } = useSignIn();
+  const { isLoaded, isSignedIn } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // If already signed in, bounce to dashboard
+  useEffect(() => {
+    if (isLoaded && isSignedIn) router.replace("/dashboard");
+  }, [isLoaded, isSignedIn, router]);
+
+  async function doLogin(e: string, p: string) {
+    setError(""); setSubmitting(true);
+    try {
+      await signIn(e, p);
+      router.replace("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Auto-login when arriving from master portal with ?autologin=1
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("autologin") === "1") {
+      const e = params.get("email") || "";
+      const p = params.get("password") || "";
+      if (e && p) {
+        setEmail(e); setPassword(p);
+        window.history.replaceState({}, "", window.location.pathname);
+        doLogin(e, p);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function onSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    await doLogin(email, password);
+  }
+
   return (
     <div className="flex min-h-screen">
       {/* Left Panel — Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A]">
-        {/* Decorative elements */}
         <div className="absolute -left-20 -top-20 h-80 w-80 rounded-full bg-[#E8611A]/20 blur-[100px]" />
         <div className="absolute -right-20 -bottom-20 h-80 w-80 rounded-full bg-[#E8611A]/10 blur-[100px]" />
-        <div className="absolute right-20 top-20 h-3 w-3 rounded-full bg-[#E8611A] animate-float opacity-60" />
-        <div className="absolute left-40 bottom-40 h-2 w-2 rounded-full bg-orange-300 animate-float opacity-40" style={{ animationDelay: "2s" }} />
-        <div className="absolute right-60 top-[60%] h-2.5 w-2.5 rounded-full bg-orange-400 animate-float opacity-30" style={{ animationDelay: "1s" }} />
-
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)",
-          backgroundSize: "60px 60px"
-        }} />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo */}
+        <div className="relative z-10 flex flex-col justify-between p-12 w-full text-white">
           <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png"
-              alt="Ornate Solar"
-              className="h-12 object-contain"
-            />
+            <img src="https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png" alt="Ornate Solar" className="h-12 object-contain" />
           </div>
-
-          {/* Main content */}
-          <div className="max-w-md">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#E8611A]/10 px-4 py-1.5 mb-6">
-              <div className="h-1.5 w-1.5 rounded-full bg-[#E8611A] animate-pulse" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#E8611A]">
-                Marketing Collateral Hub
-              </span>
-            </div>
-
-            <h1 className="text-4xl font-bold text-white leading-tight tracking-tight">
-              Your central hub for
-              <span className="block mt-1 bg-gradient-to-r from-[#E8611A] to-[#FF8A50] bg-clip-text text-transparent">
-                marketing collateral
-              </span>
-            </h1>
-
-            <p className="mt-4 text-base text-white/50 leading-relaxed">
-              Store, manage, and share brochures, datasheets, videos, and presentations
-              across all Ornate Solar products and partners.
-            </p>
-
-            {/* Feature list */}
-            <div className="mt-10 grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 backdrop-blur-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E8611A]/20">
-                  <Sun className="h-4 w-4 text-[#E8611A]" />
+          <div className="space-y-6">
+            <h1 className="text-4xl font-bold leading-tight">Marketing Collateral Hub</h1>
+            <p className="text-white/70 max-w-md">Brochures, datasheets, images, videos and more — all your sales collateral in one place.</p>
+            <div className="grid grid-cols-3 gap-4 mt-10">
+              {[
+                { Icon: Sun, label: "Solar" },
+                { Icon: Zap, label: "BESS" },
+                { Icon: Shield, label: "Compliance" },
+                { Icon: BarChart3, label: "Reports" },
+              ].map(({ Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-2 opacity-60">
+                  <Icon className="h-6 w-6" />
+                  <span className="text-xs">{label}</span>
                 </div>
-                <span className="text-sm font-medium text-white/70">Solar Products</span>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 backdrop-blur-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/20">
-                  <Zap className="h-4 w-4 text-blue-400" />
-                </div>
-                <span className="text-sm font-medium text-white/70">Inverters</span>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 backdrop-blur-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20">
-                  <Shield className="h-4 w-4 text-emerald-400" />
-                </div>
-                <span className="text-sm font-medium text-white/70">Compliance</span>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3 backdrop-blur-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20">
-                  <BarChart3 className="h-4 w-4 text-amber-400" />
-                </div>
-                <span className="text-sm font-medium text-white/70">Analytics</span>
-              </div>
+              ))}
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-white/30">
-              &copy; {new Date().getFullYear()} Ornate Solar. All rights reserved.
-            </p>
-            <a
-              href="https://ornatesolar.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-white/30 hover:text-[#E8611A] transition-colors"
-            >
-              ornatesolar.com
-            </a>
-          </div>
+          <div className="text-xs text-white/40">© Ornate Solar · Internal Use Only</div>
         </div>
       </div>
 
-      {/* Right Panel — Sign In Form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center bg-[#F4F5F7] relative">
-        {/* Mobile logo */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 lg:hidden flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://i.ibb.co/spgKSWdX"
-            alt="Ornate Solar"
-            className="h-10 object-contain"
-          />
-        </div>
-
-        {/* Background decoration */}
-        <div className="absolute -right-10 -top-10 h-60 w-60 rounded-full bg-[#E8611A]/5 blur-3xl" />
-        <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-[#E8611A]/5 blur-2xl" />
-
-        <div className="relative z-10 w-full max-w-md px-6 animate-fade-in">
-          {/* Welcome text above Clerk */}
-          <div className="mb-8 text-center lg:text-left">
-            <h2 className="text-2xl font-bold tracking-tight text-[#1A1A1A]">Welcome back</h2>
-            <p className="mt-1 text-sm text-[#6B7280]">Sign in to access your marketing collateral</p>
+      {/* Right Panel — Form */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-[#F4F5F7]">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden mb-8 text-center">
+            <img src="https://i.ibb.co/MygcTBxJ/Ornate-Logo-1.png" alt="Ornate Solar" className="h-10 mx-auto" />
           </div>
 
-          <SignIn
-            forceRedirectUrl="/dashboard"
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                card: "shadow-xl rounded-2xl border border-[#E5E7EB]/50 w-full",
-                headerTitle: "hidden",
-                headerSubtitle: "hidden",
-                socialButtonsBlockButton:
-                  "rounded-xl border-[#E5E7EB] hover:bg-orange-50 hover:border-[#E8611A]/30 transition-all",
-                formButtonPrimary:
-                  "bg-[#E8611A] hover:bg-[#D4550F] rounded-xl shadow-md shadow-orange-200/30 transition-all",
-                formFieldInput:
-                  "rounded-xl border-[#E5E7EB] focus:border-[#E8611A] focus:ring-[#E8611A]/20",
-                footerActionLink: "text-[#E8611A] hover:text-[#D4550F]",
-              },
-            }}
-          />
+          <div className="bg-white rounded-xl shadow-sm p-8 border border-[#E5E7EB]">
+            <h2 className="text-2xl font-bold text-[#1A1A1A] mb-1">Welcome back</h2>
+            <p className="text-sm text-[#6B7280] mb-6">Sign in to continue to the hub</p>
+
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-1">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2 border border-[#E5E7EB] rounded-md focus:outline-none focus:ring-2 focus:ring-[#E8611A]/20 focus:border-[#E8611A]"
+                  placeholder="you@ornatesolar.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A1A] mb-1">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-[#E5E7EB] rounded-md focus:outline-none focus:ring-2 focus:ring-[#E8611A]/20 focus:border-[#E8611A]"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-[#E8611A] hover:bg-[#D4561A] text-white py-2.5 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

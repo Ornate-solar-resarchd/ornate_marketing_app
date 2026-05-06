@@ -5,6 +5,7 @@ import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
 import { swaggerDocument } from "./swagger";
+import authRouter from "./routes/auth";
 import companiesRouter from "./routes/companies";
 import documentsRouter from "./routes/documents";
 import uploadRouter from "./routes/upload";
@@ -36,6 +37,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Public routes (no auth required)
+app.use("/api/auth", authRouter);
 app.use("/api", shareRouter);
 app.use("/api", companiesRouter);
 app.use("/api", searchRouter);
