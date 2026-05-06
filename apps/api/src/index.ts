@@ -16,6 +16,10 @@ import adminRouter from "./routes/admin";
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
 
+// Behind Cloudflare Tunnel — trust the X-Forwarded-* headers so
+// express-rate-limit sees real client IPs (and stops warning about it).
+app.set("trust proxy", 1);
+
 // Global middleware
 app.use(
   cors({

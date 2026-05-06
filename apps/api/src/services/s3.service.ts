@@ -13,6 +13,15 @@ const s3Client = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  // When AWS_ENDPOINT_URL is set (e.g. MinIO), use it.
+  // forcePathStyle is required by MinIO — it doesn't support
+  // virtual-hosted-style URLs (bucket.endpoint).
+  ...(process.env.AWS_ENDPOINT_URL
+    ? {
+        endpoint: process.env.AWS_ENDPOINT_URL,
+        forcePathStyle: true,
+      }
+    : {}),
 });
 
 const BUCKET = process.env.S3_BUCKET_NAME || "ornate-collateral-hub";
