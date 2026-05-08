@@ -57,11 +57,32 @@ export async function uploadToS3(
 
 export async function getSignedViewUrl(
   key: string,
-  expiresIn: number = 3600
+  expiresIn: number = 3600,
+  options: { filename?: string; mimeType?: string; download?: boolean } = {}
 ): Promise<string> {
+  const { filename, mimeType, download = false } = options;
+  const disposition = download
+    ? `attachment${filename ? `; filename="${filename}"` : ""}`
+    : `inline${filename ? `; filename="${filename}"` : ""}`;
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
+    ResponseContentDisposition: disposition,
+    ...(mimeType ? { ResponseContentType: mimeType } : {}),
+  });
+
+  return getSignedUrl(s3Client, command, { expiresIn });
+}
+
+export async function getSignedPutUrl(
+  key: string,
+  mimeType: string,
+  expiresIn: number = 300
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: mimeType,
   });
 
   return getSignedUrl(s3Client, command, { expiresIn });

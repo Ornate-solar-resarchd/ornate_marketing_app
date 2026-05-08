@@ -118,6 +118,103 @@ export async function uploadDocument(params: UploadFileParams) {
   return document;
 }
 
+interface RegisterFileParams {
+  fileKey: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  companyId: string;
+  docType: string;
+  uploadedBy: string;
+  uploaderName: string;
+  customName?: string;
+  tags?: string[];
+}
+
+export async function registerDocument(params: RegisterFileParams) {
+  const {
+    fileKey,
+    originalName,
+    mimeType,
+    sizeBytes,
+    companyId,
+    docType,
+    uploadedBy,
+    uploaderName,
+    customName,
+    tags,
+  } = params;
+
+  const region = process.env.AWS_REGION || "ap-south-1";
+  const bucket = process.env.S3_BUCKET_NAME || "ornate-collateral-hub";
+  const fileUrl = process.env.AWS_ENDPOINT_URL
+    ? `${process.env.AWS_ENDPOINT_URL.replace(/\/$/, "")}/${bucket}/${fileKey}`
+    : `https://${bucket}.s3.${region}.amazonaws.com/${fileKey}`;
+
+  const displayName = customName || originalName.replace(/\.[^/.]+$/, "");
+  const baseName = originalName.replace(/\.[^/.]+$/, "").toLowerCase().trim();
+  const existingDoc = await prisma.document.findFirst({
+    where: {
+      companyId,
+      docType,
+      OR: [
+        { name: { equals: displayName, mode: "insensitive" } },
+        { originalName: { startsWith: baseName, mode: "insensitive" } },
+      ],
+      parentId: null,
+    },
+    orderBy: { version: "desc" },
+  });
+
+  let parentId: string | null = null;
+  let newVersion = 1;
+  if (existingDoc) {
+    const latestInChain = await prisma.document.findFirst({
+      where: {
+        OR: [{ id: existingDoc.id }, { parentId: existingDoc.id }],
+        companyId,
+        docType,
+      },
+      orderBy: { version: "desc" },
+    });
+    if (latestInChain) {
+      parentId = existingDoc.id;
+      newVersion = latestInChain.version + 1;
+    }
+  }
+
+  const document = await prisma.document.create({
+    data: {
+      name: displayName,
+      originalName,
+      fileKey,
+      fileUrl,
+      mimeType,
+      sizeBytes,
+      docType,
+      tags: tags || [],
+      description: "",
+      version: newVersion,
+      parentId,
+      companyId,
+      uploadedBy,
+      uploaderName,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId: uploadedBy,
+      action: "upload",
+      docId: document.id,
+      companyId,
+      meta: { fileName: originalName, docType, mimeType, presigned: true },
+    },
+  });
+
+  return document;
+}
+
 export async function deleteDocument(
   documentId: string,
   userId: string,
@@ -198,7 +295,10 @@ export async function getSharedDocument(token: string) {
     throw new Error("Share link has expired");
   }
 
-  const signedUrl = await getSignedViewUrl(document.fileKey, 86400);
+  const signedUrl = await getSignedViewUrl(document.fileKey, 86400, {
+    filename: document.originalName,
+    mimeType: document.mimeType,
+  });
 
   return { signedUrl, document };
 }

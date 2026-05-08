@@ -88,22 +88,57 @@ export default function UploadModal({
     setUploading(true);
     setProgress(0);
 
-    const formData = new FormData();
-    formData.append("companyId", companyId);
-    formData.append("docType", docType);
-    if (customName.trim()) formData.append("customName", customName.trim());
-    if (tags.length > 0) formData.append("tags", JSON.stringify(tags));
-    files.forEach((file) => formData.append("files", file));
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    let completedBytes = 0;
 
     try {
-      await api.post("/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (e) => {
-          if (e.total) {
-            setProgress(Math.round((e.loaded * 100) / e.total));
-          }
-        },
-      });
+      for (const file of files) {
+        const mimeType = file.type || "application/octet-stream";
+
+        // 1. Ask backend for a presigned PUT URL
+        const { data: presign } = await api.post("/upload/presign", {
+          companyId,
+          docType,
+          filename: file.name,
+          mimeType,
+          sizeBytes: file.size,
+        });
+
+        // 2. PUT the file directly to MinIO (bytes never touch the API)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", presign.putUrl);
+          xhr.setRequestHeader("Content-Type", mimeType);
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && totalBytes > 0) {
+              const done = completedBytes + e.loaded;
+              setProgress(Math.round((done * 100) / totalBytes));
+            }
+          };
+          xhr.onload = () =>
+            xhr.status >= 200 && xhr.status < 300
+              ? resolve()
+              : reject(new Error(`HTTP ${xhr.status}`));
+          xhr.onerror = () => reject(new Error("Network error"));
+          xhr.send(file);
+        });
+
+        completedBytes += file.size;
+        setProgress(Math.round((completedBytes * 100) / totalBytes));
+
+        // 3. Register the uploaded object in the DB
+        await api.post("/upload/complete", {
+          companyId,
+          docType,
+          fileKey: presign.fileKey,
+          originalName: file.name,
+          mimeType,
+          sizeBytes: file.size,
+          customName:
+            files.length === 1 && customName.trim() ? customName.trim() : undefined,
+          tags: tags.length > 0 ? tags : undefined,
+        });
+      }
 
       toast.success("Files uploaded successfully!");
       onSuccess();
