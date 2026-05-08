@@ -83,43 +83,91 @@ export default function SharePage() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F4F5F7]">
-      <div className="mx-4 w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
-        <div className="flex items-center gap-2 text-center justify-center">
-          <Sun className="h-6 w-6 text-[#E8611A]" />
-          <span className="text-lg font-bold text-[#E8611A]">
-            Ornate Solar
-          </span>
-        </div>
+  const mime = data.document.mimeType || "";
+  const isImage = mime.startsWith("image/");
+  const isVideo = mime.startsWith("video/");
+  const isPdf = mime === "application/pdf";
+  const isInline = isImage || isVideo || isPdf;
 
-        <div className="mt-6 flex flex-col items-center">
-          <Avatar className="h-16 w-16 rounded-lg">
+  return (
+    <div className="min-h-screen bg-[#F4F5F7]">
+      {/* Header bar */}
+      <div className="bg-white border-b border-border/40 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-9 w-9 rounded-lg shrink-0">
             <AvatarImage
               src={data.document.company.logoUrl}
               alt={data.document.company.label}
             />
-            <AvatarFallback className="rounded-lg text-2xl">
+            <AvatarFallback className="rounded-lg text-base">
               {data.document.company.icon}
             </AvatarFallback>
           </Avatar>
-
-          <p className="mt-3 text-sm text-muted-foreground">
-            {data.document.company.label}
-          </p>
-          <h2 className="mt-1 text-center text-xl font-semibold">
-            {data.document.name}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {data.document.originalName}
-          </p>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground truncate">
+              {data.document.company.label}
+            </p>
+            <h2 className="text-sm font-semibold truncate">
+              {data.document.name}
+            </h2>
+          </div>
         </div>
-
-        <Button className="mt-6 w-full" onClick={handleDownload}>
-          <Download className="mr-2 h-4 w-4" />
-          Download File
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 text-[#E8611A]">
+            <Sun className="h-4 w-4" />
+            <span className="text-xs font-bold">Ornate Solar</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleDownload}>
+            <Download className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Download</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Inline preview area */}
+      {isInline ? (
+        <div className="flex items-center justify-center p-4 sm:p-8">
+          {isImage && (
+            <img
+              src={data.signedUrl}
+              alt={data.document.name}
+              className="max-h-[85vh] w-auto max-w-full rounded-lg shadow-lg"
+            />
+          )}
+          {isVideo && (
+            <video
+              src={data.signedUrl}
+              controls
+              autoPlay
+              className="max-h-[85vh] w-full max-w-5xl rounded-lg shadow-lg bg-black"
+            />
+          )}
+          {isPdf && (
+            <iframe
+              src={data.signedUrl}
+              title={data.document.name}
+              className="w-full max-w-6xl rounded-lg shadow-lg bg-white"
+              style={{ height: "85vh" }}
+            />
+          )}
+        </div>
+      ) : (
+        // Fallback for non-renderable types (Word, PPT, etc.)
+        <div className="flex min-h-[calc(100vh-60px)] items-center justify-center">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-8 shadow-lg text-center">
+            <p className="text-sm text-muted-foreground">
+              {data.document.originalName}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              This file type cannot be previewed in the browser.
+            </p>
+            <Button className="mt-6 w-full" onClick={handleDownload}>
+              <Download className="mr-2 h-4 w-4" />
+              Download File
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
