@@ -269,18 +269,27 @@ router.post(
 
       const results = await Promise.all(
         gdriveFiles.map(async (gf) => {
-          // Call Apps Script download endpoint - expects { success, name, mimeType, data (base64) }
-          const downloadRes = await fetch(`${fetcherUrl}?action=download&id=${encodeURIComponent(gf.id)}`);
-          if (!downloadRes.ok) throw new Error(`Failed to download ${gf.name}`);
-          const payload = await downloadRes.json() as { success: boolean; data?: string; mimeType?: string; name?: string; error?: string };
-          if (!payload.success || !payload.data) {
-            throw new Error(payload.error || `Download failed for ${gf.name}`);
+          // Apps Script: ?download=<fileId> returns raw base64 text (not JSON)
+          const downloadRes = await fetch(`${fetcherUrl}?download=${encodeURIComponent(gf.id)}`, {
+            redirect: "follow",
+          });
+          if (!downloadRes.ok) throw new Error(`Failed to download ${gf.name} (HTTP ${downloadRes.status})`);
+          const text = await downloadRes.text();
+          // If Apps Script errored, it returns JSON instead of base64
+          if (text.trim().startsWith("{")) {
+            try {
+              const err = JSON.parse(text) as { success?: boolean; error?: string };
+              if (err.success === false) throw new Error(err.error || `Download failed for ${gf.name}`);
+            } catch (e) {
+              if (e instanceof Error && e.message !== `Download failed for ${gf.name}`) throw e;
+            }
           }
-          const buffer = Buffer.from(payload.data, "base64");
+          const buffer = Buffer.from(text, "base64");
+          if (buffer.length === 0) throw new Error(`Empty file received for ${gf.name}`);
           return uploadDocument({
             buffer,
-            originalName: payload.name || gf.name,
-            mimeType: payload.mimeType || gf.mimeType,
+            originalName: gf.name,
+            mimeType: gf.mimeType,
             sizeBytes: buffer.length,
             companyId,
             docType,
