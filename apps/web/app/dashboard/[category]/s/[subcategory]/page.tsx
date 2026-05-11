@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Building2, ChevronRight, Sparkles, Plus, X } from "lucide-react";
+import { Building2, ChevronRight, Sparkles, Plus, X, Pencil, Trash2 } from "lucide-react";
 
 const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "compliance", "casestudy"];
 const slugify = (s: string) =>
@@ -41,8 +41,9 @@ export default function SubCategoryPage() {
   const [data, setData] = useState<SubCategoryData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Add manufacturer modal
-  const [showAdd, setShowAdd] = useState(false);
+  // Add/Edit manufacturer modal
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [mfName, setMfName] = useState("");
   const [mfIcon, setMfIcon] = useState("🏭");
   const [mfColor, setMfColor] = useState("#6B7280");
@@ -57,7 +58,35 @@ export default function SubCategoryPage() {
     reload().catch(console.error).finally(() => setLoading(false));
   }, [subSlug]);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const openAdd = () => {
+    setEditingId(null);
+    setMfName(""); setMfIcon("🏭"); setMfColor("#6B7280");
+    setMfLogoUrl(""); setMfWebsite("");
+    setShowModal(true);
+  };
+
+  const openEdit = (c: Company) => {
+    setEditingId(c.id);
+    setMfName(c.label);
+    setMfIcon(c.icon || "🏭");
+    setMfColor(c.color || "#6B7280");
+    setMfLogoUrl(c.logoUrl || "");
+    setMfWebsite(c.websiteUrl || "");
+    setShowModal(true);
+  };
+
+  const handleDelete = async (c: Company) => {
+    if (!confirm(`Delete "${c.label}" and ALL its uploaded files? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/admin/companies/${c.id}`);
+      toast.success(`Deleted "${c.label}"`);
+      reload();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || "Failed to delete");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data) return;
     if (!mfName.trim()) {
@@ -67,23 +96,29 @@ export default function SubCategoryPage() {
     setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        slug: slugify(mfName),
         label: mfName.trim(),
         icon: mfIcon || "🏭",
         color: mfColor || "#6B7280",
         logoUrl: mfLogoUrl.trim() || "https://ornatesolar.com/wp-content/uploads/2023/10/Ornate-logo-02-e1697005298472.png",
         websiteUrl: mfWebsite.trim() || "https://ornatesolar.com",
-        docTypes: DEFAULT_DOC_TYPES,
-        categoryId: (data as any).category.id,
-        subCategoryId: data.id,
       };
-      await api.post("/admin/companies", payload);
-      toast.success(`Manufacturer "${mfName}" added`);
-      setMfName(""); setMfLogoUrl(""); setMfWebsite("");
-      setShowAdd(false);
+      if (editingId) {
+        await api.patch(`/admin/companies/${editingId}`, payload);
+        toast.success(`Updated "${mfName}"`);
+      } else {
+        await api.post("/admin/companies", {
+          ...payload,
+          slug: slugify(mfName),
+          docTypes: DEFAULT_DOC_TYPES,
+          categoryId: (data as any).category.id,
+          subCategoryId: data.id,
+        });
+        toast.success(`Manufacturer "${mfName}" added`);
+      }
+      setShowModal(false);
       reload();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || "Failed to create manufacturer");
+      toast.error(err?.response?.data?.error || "Operation failed");
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +188,7 @@ export default function SubCategoryPage() {
             <p className="text-sm text-muted-foreground">Select a manufacturer to view marketing collateral</p>
           </div>
           <PermissionGate permission="manage_companies">
-            <Button onClick={() => setShowAdd(true)} className="bg-[#E8611A] hover:bg-[#D4550F]">
+            <Button onClick={openAdd} className="bg-[#E8611A] hover:bg-[#D4550F]">
               <Plus className="mr-1.5 h-4 w-4" />
               Add Manufacturer
             </Button>
@@ -165,7 +200,7 @@ export default function SubCategoryPage() {
             <Building2 className="mx-auto h-12 w-12 text-muted-foreground/50" />
             <p className="mt-4 text-sm text-muted-foreground">No manufacturers yet.</p>
             <PermissionGate permission="manage_companies">
-              <Button onClick={() => setShowAdd(true)} className="mt-4 bg-[#E8611A] hover:bg-[#D4550F]">
+              <Button onClick={openAdd} className="mt-4 bg-[#E8611A] hover:bg-[#D4550F]">
                 <Plus className="mr-1.5 h-4 w-4" />
                 Add Your First Manufacturer
               </Button>
@@ -174,38 +209,57 @@ export default function SubCategoryPage() {
         ) : (
           <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
             {data.companies.map((company) => (
-              <CompanyCard
-                key={company.id}
-                slug={company.slug}
-                label={company.label}
-                icon={company.icon}
-                color={company.color}
-                logoUrl={company.logoUrl}
-                websiteUrl={company.websiteUrl}
-                categorySlug={categorySlug}
-              />
+              <div key={company.id} className="relative group">
+                <CompanyCard
+                  slug={company.slug}
+                  label={company.label}
+                  icon={company.icon}
+                  color={company.color}
+                  logoUrl={company.logoUrl}
+                  websiteUrl={company.websiteUrl}
+                  categorySlug={categorySlug}
+                />
+                <PermissionGate permission="manage_companies">
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEdit(company); }}
+                      title="Edit"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-md border border-border/40 text-[#E8611A] hover:bg-orange-50"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(company); }}
+                      title="Delete"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-md border border-border/40 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </PermissionGate>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Add Manufacturer Modal */}
-      {showAdd && (
+      {/* Add / Edit Manufacturer Modal */}
+      {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
-             onClick={() => setShowAdd(false)}>
+             onClick={() => setShowModal(false)}>
           <div className="mx-4 w-full max-w-md rounded-2xl bg-white shadow-2xl animate-scale-in max-h-[90vh] overflow-auto"
                onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-border/50 p-5">
               <div>
-                <h3 className="text-lg font-bold tracking-tight">Add Manufacturer</h3>
+                <h3 className="text-lg font-bold tracking-tight">{editingId ? "Edit Manufacturer" : "Add Manufacturer"}</h3>
                 <p className="text-xs text-muted-foreground">{data.category.label} → {data.label}</p>
               </div>
-              <button onClick={() => setShowAdd(false)}
+              <button onClick={() => setShowModal(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleAdd} className="p-5 space-y-3">
+            <form onSubmit={handleSubmit} className="p-5 space-y-3">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name *</label>
                 <input required type="text" value={mfName} onChange={(e) => setMfName(e.target.value)}
@@ -240,9 +294,9 @@ export default function SubCategoryPage() {
                 Default sections (brochure, datasheet, images, compliance, case study) will be created where you can upload files.
               </p>
               <div className="flex gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowAdd(false)} className="flex-1">Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
                 <Button type="submit" disabled={submitting} className="flex-1 bg-[#E8611A] hover:bg-[#D4550F]">
-                  {submitting ? "Adding..." : "Add Manufacturer"}
+                  {submitting ? "Saving..." : editingId ? "Save Changes" : "Add Manufacturer"}
                 </Button>
               </div>
             </form>
