@@ -66,17 +66,18 @@ export default function SubCategoryPage() {
     }
     setSubmitting(true);
     try {
-      await api.post("/admin/companies", {
+      const payload: Record<string, unknown> = {
         slug: slugify(mfName),
         label: mfName.trim(),
         icon: mfIcon || "🏭",
         color: mfColor || "#6B7280",
-        logoUrl: mfLogoUrl.trim(),
-        websiteUrl: mfWebsite.trim(),
+        logoUrl: mfLogoUrl.trim() || "https://ornatesolar.com/wp-content/uploads/2023/10/Ornate-logo-02-e1697005298472.png",
+        websiteUrl: mfWebsite.trim() || "https://ornatesolar.com",
         docTypes: DEFAULT_DOC_TYPES,
         categoryId: (data as any).category.id,
         subCategoryId: data.id,
-      });
+      };
+      await api.post("/admin/companies", payload);
       toast.success(`Manufacturer "${mfName}" added`);
       setMfName(""); setMfLogoUrl(""); setMfWebsite("");
       setShowAdd(false);

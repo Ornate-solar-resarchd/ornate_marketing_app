@@ -48,6 +48,7 @@ export const CreateCompanySchema = z.object({
   websiteUrl: z.string().url(),
   docTypes: z.array(z.string()).min(1),
   categoryId: z.string().min(1),
+  subCategoryId: z.string().min(1).optional(),
 });
 
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
