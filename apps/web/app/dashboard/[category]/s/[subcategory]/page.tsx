@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import CompanyCard from "@/components/dashboard/CompanyCard";
+import PermissionGate from "@/components/rbac/PermissionGate";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api";
-import { Building2, ChevronRight, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { Building2, ChevronRight, Sparkles, Plus, X } from "lucide-react";
+
+const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "compliance", "casestudy"];
+const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 interface Company {
   id: string;
@@ -24,7 +31,7 @@ interface SubCategoryData {
   label: string;
   icon: string;
   companies: Company[];
-  category: { slug: string; label: string };
+  category: { id: string; slug: string; label: string };
 }
 
 export default function SubCategoryPage() {
@@ -34,13 +41,52 @@ export default function SubCategoryPage() {
   const [data, setData] = useState<SubCategoryData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Add manufacturer modal
+  const [showAdd, setShowAdd] = useState(false);
+  const [mfName, setMfName] = useState("");
+  const [mfIcon, setMfIcon] = useState("🏭");
+  const [mfColor, setMfColor] = useState("#6B7280");
+  const [mfLogoUrl, setMfLogoUrl] = useState("");
+  const [mfWebsite, setMfWebsite] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const reload = () =>
+    api.get(`/subcategories/${subSlug}`).then((res) => setData(res.data));
+
   useEffect(() => {
-    api
-      .get(`/subcategories/${subSlug}`)
-      .then((res) => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    reload().catch(console.error).finally(() => setLoading(false));
   }, [subSlug]);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!data) return;
+    if (!mfName.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post("/admin/companies", {
+        slug: slugify(mfName),
+        label: mfName.trim(),
+        icon: mfIcon || "🏭",
+        color: mfColor || "#6B7280",
+        logoUrl: mfLogoUrl.trim(),
+        websiteUrl: mfWebsite.trim(),
+        docTypes: DEFAULT_DOC_TYPES,
+        categoryId: (data as any).category.id,
+        subCategoryId: data.id,
+      });
+      toast.success(`Manufacturer "${mfName}" added`);
+      setMfName(""); setMfLogoUrl(""); setMfWebsite("");
+      setShowAdd(false);
+      reload();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || "Failed to create manufacturer");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -100,13 +146,29 @@ export default function SubCategoryPage() {
 
       {/* Brands Grid */}
       <div className="mt-8">
-        <h2 className="text-lg font-bold text-foreground">Brands</h2>
-        <p className="text-sm text-muted-foreground">Select a brand to view marketing collateral</p>
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Manufacturers</h2>
+            <p className="text-sm text-muted-foreground">Select a manufacturer to view marketing collateral</p>
+          </div>
+          <PermissionGate permission="manage_companies">
+            <Button onClick={() => setShowAdd(true)} className="bg-[#E8611A] hover:bg-[#D4550F]">
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Manufacturer
+            </Button>
+          </PermissionGate>
+        </div>
 
         {data.companies.length === 0 ? (
           <div className="mt-6 rounded-2xl border border-dashed bg-muted/30 p-12 text-center">
             <Building2 className="mx-auto h-12 w-12 text-muted-foreground/50" />
-            <p className="mt-4 text-sm text-muted-foreground">No brands yet — create one from the Admin panel.</p>
+            <p className="mt-4 text-sm text-muted-foreground">No manufacturers yet.</p>
+            <PermissionGate permission="manage_companies">
+              <Button onClick={() => setShowAdd(true)} className="mt-4 bg-[#E8611A] hover:bg-[#D4550F]">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add Your First Manufacturer
+              </Button>
+            </PermissionGate>
           </div>
         ) : (
           <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
@@ -125,6 +187,67 @@ export default function SubCategoryPage() {
           </div>
         )}
       </div>
+
+      {/* Add Manufacturer Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
+             onClick={() => setShowAdd(false)}>
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white shadow-2xl animate-scale-in max-h-[90vh] overflow-auto"
+               onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border/50 p-5">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight">Add Manufacturer</h3>
+                <p className="text-xs text-muted-foreground">{data.category.label} → {data.label}</p>
+              </div>
+              <button onClick={() => setShowAdd(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAdd} className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name *</label>
+                <input required type="text" value={mfName} onChange={(e) => setMfName(e.target.value)}
+                  placeholder="e.g. BYD, CATL, Sungrow"
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Icon</label>
+                  <input type="text" value={mfIcon} onChange={(e) => setMfIcon(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Color</label>
+                  <input type="color" value={mfColor} onChange={(e) => setMfColor(e.target.value)}
+                    className="mt-1 h-10 w-full rounded-xl border border-border/50 px-1 py-1" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Logo URL (optional)</label>
+                <input type="url" value={mfLogoUrl} onChange={(e) => setMfLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Website (optional)</label>
+                <input type="url" value={mfWebsite} onChange={(e) => setMfWebsite(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Default sections (brochure, datasheet, images, compliance, case study) will be created where you can upload files.
+              </p>
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowAdd(false)} className="flex-1">Cancel</Button>
+                <Button type="submit" disabled={submitting} className="flex-1 bg-[#E8611A] hover:bg-[#D4550F]">
+                  {submitting ? "Adding..." : "Add Manufacturer"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
