@@ -230,4 +230,74 @@ router.post(
   }
 );
 
+// POST /api/upload/gdrive — import files from Google Drive via the Apps Script fetcher
+router.post(
+  "/upload/gdrive",
+  uploadLimiter,
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const { companyId, docType, files: gdriveFiles, customName, tags } = req.body as {
+        companyId?: string;
+        docType?: string;
+        files?: Array<{ id: string; name: string; mimeType: string }>;
+        customName?: string;
+        tags?: string[];
+      };
+
+      if (!companyId || !docType || !gdriveFiles || gdriveFiles.length === 0) {
+        res.status(400).json({ error: "companyId, docType, and files are required", code: "VALIDATION_ERROR" });
+        return;
+      }
+
+      if (!(docType in DOC_TYPES)) {
+        res.status(400).json({ error: "Invalid document type", code: "VALIDATION_ERROR" });
+        return;
+      }
+
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      if (!company) {
+        res.status(404).json({ error: "Company not found", code: "NOT_FOUND" });
+        return;
+      }
+
+      const fetcherUrl = process.env.GDRIVE_FETCHER_URL;
+      if (!fetcherUrl) {
+        res.status(500).json({ error: "GDRIVE_FETCHER_URL not configured", code: "CONFIG_ERROR" });
+        return;
+      }
+
+      const results = await Promise.all(
+        gdriveFiles.map(async (gf) => {
+          // Call Apps Script download endpoint - expects { success, name, mimeType, data (base64) }
+          const downloadRes = await fetch(`${fetcherUrl}?action=download&id=${encodeURIComponent(gf.id)}`);
+          if (!downloadRes.ok) throw new Error(`Failed to download ${gf.name}`);
+          const payload = await downloadRes.json() as { success: boolean; data?: string; mimeType?: string; name?: string; error?: string };
+          if (!payload.success || !payload.data) {
+            throw new Error(payload.error || `Download failed for ${gf.name}`);
+          }
+          const buffer = Buffer.from(payload.data, "base64");
+          return uploadDocument({
+            buffer,
+            originalName: payload.name || gf.name,
+            mimeType: payload.mimeType || gf.mimeType,
+            sizeBytes: buffer.length,
+            companyId,
+            docType,
+            uploadedBy: req.user!.userId,
+            uploaderName: req.user!.userId,
+            customName: gdriveFiles.length === 1 && customName ? customName : undefined,
+            tags: tags || [],
+          });
+        })
+      );
+
+      res.status(201).json({ documents: results });
+    } catch (error) {
+      logger.error("GDrive import error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "GDrive import failed", code: "GDRIVE_IMPORT_ERROR" });
+    }
+  }
+);
+
 export default router;

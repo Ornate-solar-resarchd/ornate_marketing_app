@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { X, Upload, FileText, CloudUpload, Tag, Type } from "lucide-react";
+import { X, Upload, FileText, CloudUpload, Tag, Type, HardDrive, Search, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
@@ -29,6 +29,14 @@ export default function UploadModal({
   const [customName, setCustomName] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+
+  // GDrive state
+  const [mode, setMode] = useState<"local" | "gdrive">("local");
+  const [gdriveQuery, setGdriveQuery] = useState("");
+  const [gdriveSearching, setGdriveSearching] = useState(false);
+  const [gdriveResults, setGdriveResults] = useState<Array<{ id: string; name: string; mimeType: string; size: string; iconUrl: string }>>([]);
+  const [gdriveSelected, setGdriveSelected] = useState<Record<string, { id: string; name: string; mimeType: string }>>({});
+  const selectedCount = Object.keys(gdriveSelected).length;
 
   const typeInfo = DOC_TYPES[docType];
   const acceptExtensions = typeInfo.accept.split(",");
@@ -82,7 +90,77 @@ export default function UploadModal({
     }
   };
 
+  const searchGDrive = async () => {
+    const q = gdriveQuery.trim();
+    if (!q) return;
+    setGdriveSearching(true);
+    try {
+      const fetcher = process.env.NEXT_PUBLIC_GDRIVE_FETCHER_URL;
+      if (!fetcher) {
+        toast.error("GDrive fetcher not configured");
+        return;
+      }
+      const res = await fetch(`${fetcher}?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || "GDrive search failed");
+        return;
+      }
+      // Filter by accepted extensions for this docType
+      const filtered = (data.results || []).filter((r: { name: string }) => {
+        const ext = "." + r.name.split(".").pop()?.toLowerCase();
+        return acceptExtensions.includes(ext);
+      });
+      setGdriveResults(filtered);
+      if (filtered.length === 0) {
+        toast.info(`No ${acceptExtensions.join("/")} files found for "${q}"`);
+      }
+    } catch (e) {
+      toast.error("GDrive search failed");
+      console.error(e);
+    } finally {
+      setGdriveSearching(false);
+    }
+  };
+
+  const toggleGDriveSelect = (file: { id: string; name: string; mimeType: string }) => {
+    setGdriveSelected((prev) => {
+      const next = { ...prev };
+      if (next[file.id]) delete next[file.id];
+      else next[file.id] = file;
+      return next;
+    });
+  };
+
+  const handleGDriveImport = async () => {
+    if (selectedCount === 0) return;
+    setUploading(true);
+    setProgress(20);
+    try {
+      const filesPayload = Object.values(gdriveSelected);
+      setProgress(50);
+      await api.post("/upload/gdrive", {
+        companyId,
+        docType,
+        files: filesPayload,
+        customName: filesPayload.length === 1 && customName.trim() ? customName.trim() : undefined,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      setProgress(100);
+      toast.success(`Imported ${selectedCount} file${selectedCount !== 1 ? "s" : ""} from Google Drive!`);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || "GDrive import failed");
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleUpload = async () => {
+    if (mode === "gdrive") return handleGDriveImport();
     if (files.length === 0) return;
 
     setUploading(true);
@@ -175,51 +253,148 @@ export default function UploadModal({
 
         {/* Body */}
         <div className="p-5 space-y-4">
-          {/* Drop zone */}
-          <div
-            {...getRootProps()}
-            className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
-              isDragActive
-                ? "border-[#E8611A] bg-orange-50 scale-[1.02]"
-                : "border-border/50 hover:border-[#E8611A]/50 hover:bg-orange-50/30"
-            }`}
-          >
-            <input {...getInputProps()} />
-            <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300 ${
-              isDragActive
-                ? "bg-gradient-to-br from-[#E8611A] to-[#FF8A50] text-white shadow-lg"
-                : "bg-muted/60 text-muted-foreground"
-            }`}>
-              <CloudUpload className="h-7 w-7" />
-            </div>
-            <p className="mt-3 text-sm font-semibold text-foreground">
-              {isDragActive ? "Drop files here" : "Drag & drop files here"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">or click to browse</p>
-            <p className="mt-2 inline-flex rounded-full bg-muted/60 px-3 py-1 text-[10px] font-medium text-muted-foreground">
-              Accepted: {acceptExtensions.join(", ")}
-            </p>
+          {/* Mode Tabs */}
+          <div className="flex gap-1 rounded-xl bg-muted/40 p-1">
+            <button
+              onClick={() => setMode("local")}
+              disabled={uploading}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                mode === "local"
+                  ? "bg-white text-[#E8611A] shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CloudUpload className="h-4 w-4" />
+              Computer
+            </button>
+            <button
+              onClick={() => setMode("gdrive")}
+              disabled={uploading}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
+                mode === "gdrive"
+                  ? "bg-white text-[#E8611A] shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <HardDrive className="h-4 w-4" />
+              Google Drive
+            </button>
           </div>
 
+          {mode === "local" ? (
+            /* Local Drop zone */
+            <div
+              {...getRootProps()}
+              className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
+                isDragActive
+                  ? "border-[#E8611A] bg-orange-50 scale-[1.02]"
+                  : "border-border/50 hover:border-[#E8611A]/50 hover:bg-orange-50/30"
+              }`}
+            >
+              <input {...getInputProps()} />
+              <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl transition-all duration-300 ${
+                isDragActive
+                  ? "bg-gradient-to-br from-[#E8611A] to-[#FF8A50] text-white shadow-lg"
+                  : "bg-muted/60 text-muted-foreground"
+              }`}>
+                <CloudUpload className="h-7 w-7" />
+              </div>
+              <p className="mt-3 text-sm font-semibold text-foreground">
+                {isDragActive ? "Drop files here" : "Drag & drop files here"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">or click to browse</p>
+              <p className="mt-2 inline-flex rounded-full bg-muted/60 px-3 py-1 text-[10px] font-medium text-muted-foreground">
+                Accepted: {acceptExtensions.join(", ")}
+              </p>
+            </div>
+          ) : (
+            /* GDrive Panel */
+            <div className="space-y-3 animate-fade-in">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search Google Drive..."
+                    value={gdriveQuery}
+                    onChange={(e) => setGdriveQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchGDrive()}
+                    disabled={uploading}
+                    className="pl-9 rounded-xl"
+                  />
+                </div>
+                <Button
+                  onClick={searchGDrive}
+                  disabled={!gdriveQuery.trim() || gdriveSearching || uploading}
+                  className="rounded-xl bg-[#E8611A] hover:bg-[#D4550F]"
+                >
+                  {gdriveSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                </Button>
+              </div>
+
+              {gdriveResults.length > 0 && (
+                <div className="max-h-72 overflow-auto rounded-xl border border-border/50 divide-y divide-border/30">
+                  {gdriveResults.map((file) => {
+                    const isSelected = !!gdriveSelected[file.id];
+                    return (
+                      <button
+                        key={file.id}
+                        onClick={() => toggleGDriveSelect(file)}
+                        disabled={uploading}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                          isSelected ? "bg-orange-50" : "hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                          isSelected
+                            ? "bg-[#E8611A] border-[#E8611A]"
+                            : "border-border/50"
+                        }`}>
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="text-lg">{file.iconUrl}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">{file.size}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {gdriveResults.length === 0 && !gdriveSearching && (
+                <div className="rounded-2xl border-2 border-dashed border-border/50 p-8 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60">
+                    <HardDrive className="h-7 w-7 text-muted-foreground" />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold">Search to find files</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Showing only {acceptExtensions.join(", ")} files
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Custom Name */}
-          {files.length > 0 && (
+          {(mode === "local" ? files.length > 0 : selectedCount > 0) && (
             <div className="animate-fade-in-up">
               <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                 <Type className="h-3 w-3" />
-                Display Name {files.length > 1 && <span className="normal-case font-normal">(applies to single file only)</span>}
+                Display Name {(mode === "local" ? files.length : selectedCount) > 1 && <span className="normal-case font-normal">(applies to single file only)</span>}
               </label>
               <Input
                 placeholder="Custom name for the file (optional)"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 className="rounded-xl border-border/50 focus:border-[#E8611A]/30 focus:ring-1 focus:ring-[#E8611A]/10"
-                disabled={files.length > 1}
+                disabled={(mode === "local" ? files.length : selectedCount) > 1}
               />
             </div>
           )}
 
           {/* Tags */}
-          {files.length > 0 && (
+          {(mode === "local" ? files.length > 0 : selectedCount > 0) && (
             <div className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
               <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                 <Tag className="h-3 w-3" />
@@ -254,7 +429,7 @@ export default function UploadModal({
           )}
 
           {/* File list */}
-          {files.length > 0 && (
+          {mode === "local" && files.length > 0 && (
             <div className="max-h-48 space-y-2 overflow-auto rounded-xl">
               {files.map((file, index) => (
                 <div
@@ -316,13 +491,18 @@ export default function UploadModal({
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={files.length === 0 || uploading}
+            disabled={(mode === "local" ? files.length === 0 : selectedCount === 0) || uploading}
             className="rounded-xl bg-[#E8611A] hover:bg-[#D4550F] shadow-md shadow-orange-200/30 transition-all hover:scale-105 active:scale-95"
           >
             {uploading ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Uploading...
+                {mode === "gdrive" ? "Importing..." : "Uploading..."}
+              </>
+            ) : mode === "gdrive" ? (
+              <>
+                <HardDrive className="mr-1.5 h-4 w-4" />
+                Import {selectedCount} file{selectedCount !== 1 ? "s" : ""}
               </>
             ) : (
               <>
