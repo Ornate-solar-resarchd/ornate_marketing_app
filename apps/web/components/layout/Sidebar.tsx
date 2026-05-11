@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Building2,
   BatteryCharging,
+  Battery,
   Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const navItems = [
   { label: "Ornate Products", href: "/dashboard/ornate-products", icon: Sun, section: "categories" },
   { label: "Panels", href: "/dashboard/panels", icon: PanelTop, section: "categories" },
   { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
+  { label: "Energy Storage System", href: "/dashboard/energy-storage-system", icon: Battery, section: "categories" },
 ];
 
 export default function Sidebar() {

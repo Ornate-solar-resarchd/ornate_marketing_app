@@ -9,29 +9,49 @@ datasource db {
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  slug      String    @unique
-  label     String
-  icon      String
-  order     Int       @default(0)
-  companies Company[]
-  createdAt DateTime  @default(now())
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  label         String
+  icon          String
+  order         Int           @default(0)
+  companies     Company[]
+  subCategories SubCategory[]
+  createdAt     DateTime      @default(now())
+}
+
+model SubCategory {
+  id         String    @id @default(cuid())
+  slug       String    @unique
+  label      String
+  icon       String    @default("📦")
+  order      Int       @default(0)
+  categoryId String
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  companies  Company[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([categoryId])
 }
 
 model Company {
-  id         String     @id @default(cuid())
-  slug       String     @unique
-  label      String
-  icon       String
-  color      String
-  logoUrl    String
-  websiteUrl String
-  docTypes   String[]
-  categoryId String
-  category   Category   @relation(fields: [categoryId], references: [id])
-  documents  Document[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id            String       @id @default(cuid())
+  slug          String       @unique
+  label         String
+  icon          String
+  color         String
+  logoUrl       String
+  websiteUrl    String
+  docTypes      String[]
+  categoryId    String
+  category      Category     @relation(fields: [categoryId], references: [id])
+  subCategoryId String?
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  documents     Document[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([subCategoryId])
 }
 
 model Document {

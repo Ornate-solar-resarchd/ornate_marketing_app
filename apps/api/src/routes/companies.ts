@@ -22,7 +22,14 @@ router.get("/categories/:slug", async (req, res) => {
     const category = await prisma.category.findUnique({
       where: { slug: req.params.slug },
       include: {
-        companies: { orderBy: { label: "asc" } },
+        subCategories: {
+          orderBy: { order: "asc" },
+          include: { _count: { select: { companies: true } } },
+        },
+        companies: {
+          where: { subCategoryId: null },
+          orderBy: { label: "asc" },
+        },
       },
     });
 
@@ -35,6 +42,28 @@ router.get("/categories/:slug", async (req, res) => {
   } catch (error) {
     logger.error("Error fetching category:", error);
     res.status(500).json({ error: "Failed to fetch category", code: "FETCH_ERROR" });
+  }
+});
+
+router.get("/subcategories/:slug", async (req, res) => {
+  try {
+    const subCategory = await prisma.subCategory.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        category: true,
+        companies: { orderBy: { label: "asc" } },
+      },
+    });
+
+    if (!subCategory) {
+      res.status(404).json({ error: "Sub-category not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    res.json(subCategory);
+  } catch (error) {
+    logger.error("Error fetching sub-category:", error);
+    res.status(500).json({ error: "Failed to fetch sub-category", code: "FETCH_ERROR" });
   }
 });
 

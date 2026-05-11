@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ROLES, type Role } from "@ornate/types";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Users, FileText, Shield, Activity, Sparkles } from "lucide-react";
+import { Users, FileText, Shield, Activity, Sparkles, Factory, Plus } from "lucide-react";
 
 interface User {
   id: string;
@@ -29,11 +29,31 @@ interface AuditLog {
   createdAt: string;
 }
 
+interface SubCategoryRow {
+  id: string;
+  slug: string;
+  label: string;
+  category: { id: string; slug: string; label: string };
+  companies: { id: string; slug: string; label: string }[];
+}
+
+const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "compliance", "casestudy"];
+
 export default function AdminPage() {
-  const [tab, setTab] = useState<"users" | "audit">("users");
+  const [tab, setTab] = useState<"users" | "audit" | "manufacturers">("users");
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // New manufacturer form state
+  const [mfName, setMfName] = useState("");
+  const [mfSubCategoryId, setMfSubCategoryId] = useState("");
+  const [mfIcon, setMfIcon] = useState("🏭");
+  const [mfColor, setMfColor] = useState("#6B7280");
+  const [mfLogoUrl, setMfLogoUrl] = useState("");
+  const [mfWebsite, setMfWebsite] = useState("");
+  const [mfSubmitting, setMfSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -42,16 +62,66 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [usersRes, logsRes] = await Promise.all([
+      const [usersRes, logsRes, esRes] = await Promise.all([
         api.get("/admin/users"),
         api.get("/admin/audit-logs?limit=50"),
+        api.get("/categories/energy-storage-system"),
       ]);
       setUsers(usersRes.data);
       setAuditLogs(logsRes.data);
+      // Build sub-category rows with their companies
+      const cat = esRes.data;
+      const rows: SubCategoryRow[] = await Promise.all(
+        (cat.subCategories ?? []).map(async (sc: any) => {
+          const full = await api.get(`/subcategories/${sc.slug}`);
+          return {
+            id: full.data.id,
+            slug: full.data.slug,
+            label: full.data.label,
+            category: full.data.category,
+            companies: full.data.companies ?? [],
+          };
+        })
+      );
+      setSubCategories(rows);
     } catch {
       toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const slugify = (s: string) =>
+    s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  const handleAddManufacturer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfName.trim() || !mfSubCategoryId) {
+      toast.error("Name and sub-category are required");
+      return;
+    }
+    const sub = subCategories.find((s) => s.id === mfSubCategoryId);
+    if (!sub) return;
+    setMfSubmitting(true);
+    try {
+      await api.post("/admin/companies", {
+        slug: slugify(mfName),
+        label: mfName.trim(),
+        icon: mfIcon || "🏭",
+        color: mfColor || "#6B7280",
+        logoUrl: mfLogoUrl.trim(),
+        websiteUrl: mfWebsite.trim(),
+        docTypes: DEFAULT_DOC_TYPES,
+        categoryId: sub.category.id,
+        subCategoryId: sub.id,
+      });
+      toast.success(`Manufacturer "${mfName}" added under ${sub.label}`);
+      setMfName(""); setMfLogoUrl(""); setMfWebsite("");
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || "Failed to create manufacturer");
+    } finally {
+      setMfSubmitting(false);
     }
   };
 
@@ -126,6 +196,17 @@ export default function AdminPage() {
           Users ({users.length})
         </button>
         <button
+          onClick={() => setTab("manufacturers")}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+            tab === "manufacturers"
+              ? "bg-[#E8611A] text-white shadow-md shadow-orange-200/30 scale-105"
+              : "bg-white border border-border/50 text-muted-foreground hover:text-foreground hover:border-[#E8611A]/30"
+          }`}
+        >
+          <Factory className="h-4 w-4" />
+          Manufacturers
+        </button>
+        <button
           onClick={() => setTab("audit")}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
             tab === "audit"
@@ -137,6 +218,120 @@ export default function AdminPage() {
           Audit Log
         </button>
       </div>
+
+      {/* Manufacturers Tab */}
+      {tab === "manufacturers" && (
+        <div className="mt-5 grid gap-6 lg:grid-cols-2 animate-fade-in-up">
+          {/* Add form */}
+          <div className="rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Plus className="h-4 w-4 text-[#E8611A]" />
+              <h2 className="text-base font-bold">Add Manufacturer</h2>
+            </div>
+            <form onSubmit={handleAddManufacturer} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sub-category *</label>
+                <select
+                  required
+                  value={mfSubCategoryId}
+                  onChange={(e) => setMfSubCategoryId(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
+                >
+                  <option value="">— Select —</option>
+                  {subCategories.map((s) => (
+                    <option key={s.id} value={s.id}>{s.category.label} → {s.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Manufacturer Name *</label>
+                <input
+                  required
+                  type="text"
+                  value={mfName}
+                  onChange={(e) => setMfName(e.target.value)}
+                  placeholder="e.g. BYD, CATL, Sungrow"
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Icon (emoji)</label>
+                  <input
+                    type="text"
+                    value={mfIcon}
+                    onChange={(e) => setMfIcon(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand Color</label>
+                  <input
+                    type="color"
+                    value={mfColor}
+                    onChange={(e) => setMfColor(e.target.value)}
+                    className="mt-1 h-10 w-full rounded-xl border border-border/50 px-1 py-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Logo URL (optional)</label>
+                <input
+                  type="url"
+                  value={mfLogoUrl}
+                  onChange={(e) => setMfLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Website URL (optional)</label>
+                <input
+                  type="url"
+                  value={mfWebsite}
+                  onChange={(e) => setMfWebsite(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Default doc sections will be created: brochure, datasheet, images, compliance, case study. You can upload to any of these once the manufacturer is created.
+              </p>
+              <Button type="submit" disabled={mfSubmitting} className="w-full bg-[#E8611A] hover:bg-[#D4550F]">
+                {mfSubmitting ? "Adding..." : "Add Manufacturer"}
+              </Button>
+            </form>
+          </div>
+
+          {/* Existing list grouped by sub-category */}
+          <div className="rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-bold mb-4">Existing Manufacturers</h2>
+            {subCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sub-categories yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {subCategories.map((sc) => (
+                  <div key={sc.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#E8611A]">{sc.label}</span>
+                      <Badge variant="outline" className="text-[10px]">{sc.companies.length}</Badge>
+                    </div>
+                    {sc.companies.length === 0 ? (
+                      <p className="text-xs text-muted-foreground ml-1">— No manufacturers yet</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {sc.companies.map((c) => (
+                          <li key={c.id} className="ml-1 text-sm text-foreground">• {c.label}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Users Tab */}
       {tab === "users" && (

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import CompanyCard from "@/components/dashboard/CompanyCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
-import { Building2, Sparkles } from "lucide-react";
+import { Building2, Sparkles, FolderTree, ChevronRight } from "lucide-react";
 
 interface Company {
   id: string;
@@ -18,12 +19,21 @@ interface Company {
   websiteUrl: string;
 }
 
+interface SubCategory {
+  id: string;
+  slug: string;
+  label: string;
+  icon: string;
+  _count?: { companies: number };
+}
+
 interface CategoryData {
   id: string;
   slug: string;
   label: string;
   icon: string;
   companies: Company[];
+  subCategories?: SubCategory[];
 }
 
 const categoryGradients: Record<string, { from: string; to: string; accent: string }> = {
@@ -101,26 +111,60 @@ export default function CategoryPage() {
         </div>
       </div>
 
-      {/* Companies Grid */}
-      <div className="mt-8">
-        <h2 className="text-lg font-bold text-foreground">Companies</h2>
-        <p className="text-sm text-muted-foreground">Select a company to view marketing collateral</p>
+      {/* Sub-Categories Grid (if any) */}
+      {category.subCategories && category.subCategories.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-foreground">Component Types</h2>
+          <p className="text-sm text-muted-foreground">Select a component type to view brands</p>
 
-        <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
-          {category.companies.map((company) => (
-            <CompanyCard
-              key={company.id}
-              slug={company.slug}
-              label={company.label}
-              icon={company.icon}
-              color={company.color}
-              logoUrl={company.logoUrl}
-              websiteUrl={company.websiteUrl}
-              categorySlug={categorySlug}
-            />
-          ))}
+          <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {category.subCategories.map((sc) => (
+              <Link
+                key={sc.id}
+                href={`/dashboard/${categorySlug}/s/${sc.slug}`}
+                className="group flex items-center gap-4 rounded-2xl border bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:border-[#E8611A]/40"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 text-2xl">
+                  {sc.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-foreground truncate">{sc.label}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <FolderTree className="inline h-3 w-3 mr-1" />
+                    {sc._count?.companies ?? 0} brand{(sc._count?.companies ?? 0) === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-[#E8611A]" />
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Companies Grid (only direct children — not those under sub-categories) */}
+      {category.companies.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-foreground">
+            {category.subCategories && category.subCategories.length > 0 ? "Other Companies" : "Companies"}
+          </h2>
+          <p className="text-sm text-muted-foreground">Select a company to view marketing collateral</p>
+
+          <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 stagger-children">
+            {category.companies.map((company) => (
+              <CompanyCard
+                key={company.id}
+                slug={company.slug}
+                label={company.label}
+                icon={company.icon}
+                color={company.color}
+                logoUrl={company.logoUrl}
+                websiteUrl={company.websiteUrl}
+                categorySlug={categorySlug}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

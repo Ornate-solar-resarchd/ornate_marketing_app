@@ -199,6 +199,80 @@ router.delete(
   }
 );
 
+// ─── Sub-Categories CRUD ──────────────────────────────────────────────
+
+// POST /api/admin/subcategories — Create new sub-category
+router.post(
+  "/admin/subcategories",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      const { slug, label, icon, order, categoryId } = req.body as {
+        slug?: string;
+        label?: string;
+        icon?: string;
+        order?: number;
+        categoryId?: string;
+      };
+
+      if (!slug || !label || !categoryId) {
+        res.status(400).json({
+          error: "slug, label and categoryId are required",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const subCategory = await prisma.subCategory.create({
+        data: {
+          slug,
+          label,
+          icon: icon || "📦",
+          order: order ?? 0,
+          categoryId,
+        },
+      });
+      res.status(201).json(subCategory);
+    } catch (error) {
+      logger.error("Error creating sub-category:", error);
+      res.status(500).json({ error: "Failed to create sub-category", code: "CREATE_ERROR" });
+    }
+  }
+);
+
+// PATCH /api/admin/subcategories/:id — Edit sub-category
+router.patch(
+  "/admin/subcategories/:id",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      const sc = await prisma.subCategory.update({
+        where: { id: req.params.id as string },
+        data: req.body,
+      });
+      res.json(sc);
+    } catch (error) {
+      logger.error("Error updating sub-category:", error);
+      res.status(500).json({ error: "Failed to update sub-category", code: "UPDATE_ERROR" });
+    }
+  }
+);
+
+// DELETE /api/admin/subcategories/:id — Delete sub-category (companies stay, just unlinked)
+router.delete(
+  "/admin/subcategories/:id",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      await prisma.subCategory.delete({ where: { id: req.params.id as string } });
+      res.json({ message: "Sub-category deleted (companies preserved without sub-category)" });
+    } catch (error) {
+      logger.error("Error deleting sub-category:", error);
+      res.status(500).json({ error: "Failed to delete sub-category", code: "DELETE_ERROR" });
+    }
+  }
+);
+
 // GET /api/admin/audit-logs — Recent audit logs
 router.get(
   "/admin/audit-logs",
