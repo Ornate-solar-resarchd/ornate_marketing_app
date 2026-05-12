@@ -169,10 +169,11 @@ export default function UploadModal({
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
     let completedBytes = 0;
 
-    // Files larger than this go through multipart upload (CF caps single
-    // request body at 100 MB; we use 80 MB part size to leave headroom).
-    const MULTIPART_THRESHOLD = 80 * 1024 * 1024;
-    const PART_SIZE = 80 * 1024 * 1024;
+    // Multipart config — small chunks + concurrency = faster on most ISPs.
+    // Files larger than threshold use multipart (CF caps single request at 100 MB).
+    const MULTIPART_THRESHOLD = 50 * 1024 * 1024;  // 50 MB
+    const PART_SIZE = 20 * 1024 * 1024;            // 20 MB
+    const CONCURRENCY = 4;                          // upload 4 parts in parallel
 
     try {
       for (const file of files) {
@@ -214,9 +215,16 @@ export default function UploadModal({
           let partCompletedBytes = 0;
 
           try {
-            for (let i = 0; i < totalParts; i++) {
-              const partNumber = i + 1;
-              const start = i * PART_SIZE;
+            // Track in-flight bytes per part to compute accurate live progress
+            const partProgress = new Array(totalParts).fill(0);
+            const updateProgress = () => {
+              const inFlight = partProgress.reduce((a, b) => a + b, 0);
+              const done = completedBytes + partCompletedBytes + inFlight;
+              setProgress(Math.round((done * 100) / totalBytes));
+            };
+
+            const uploadOnePart = async (partNumber: number): Promise<{ PartNumber: number; ETag: string }> => {
+              const start = (partNumber - 1) * PART_SIZE;
               const end = Math.min(start + PART_SIZE, file.size);
               const blob = file.slice(start, end);
 
@@ -224,29 +232,43 @@ export default function UploadModal({
                 fileKey, uploadId, partNumber,
               });
 
-              const etag = await new Promise<string>((resolve, reject) => {
+              return new Promise<{ PartNumber: number; ETag: string }>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.open("PUT", signed.partUrl);
                 xhr.upload.onprogress = (e) => {
-                  if (e.lengthComputable && totalBytes > 0) {
-                    const done = completedBytes + partCompletedBytes + e.loaded;
-                    setProgress(Math.round((done * 100) / totalBytes));
+                  if (e.lengthComputable) {
+                    partProgress[partNumber - 1] = e.loaded;
+                    updateProgress();
                   }
                 };
                 xhr.onload = () => {
                   if (xhr.status >= 200 && xhr.status < 300) {
                     const tag = (xhr.getResponseHeader("ETag") || "").replace(/"/g, "");
                     if (!tag) return reject(new Error("Missing ETag from part upload"));
-                    resolve(tag);
+                    partProgress[partNumber - 1] = 0;
+                    partCompletedBytes += (end - start);
+                    resolve({ PartNumber: partNumber, ETag: tag });
                   } else reject(new Error(`Part ${partNumber} HTTP ${xhr.status}`));
                 };
                 xhr.onerror = () => reject(new Error(`Part ${partNumber} network error`));
                 xhr.send(blob);
               });
+            };
 
-              parts.push({ PartNumber: partNumber, ETag: etag });
-              partCompletedBytes += (end - start);
+            // Concurrency pool: up to CONCURRENCY parts in-flight at once
+            const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
+            let nextIndex = 0;
+            const workers: Promise<void>[] = [];
+            for (let c = 0; c < Math.min(CONCURRENCY, totalParts); c++) {
+              workers.push((async () => {
+                while (nextIndex < queue.length) {
+                  const partNumber = queue[nextIndex++];
+                  const result = await uploadOnePart(partNumber);
+                  parts.push(result);
+                }
+              })());
             }
+            await Promise.all(workers);
 
             await api.post("/upload/multipart/complete", { fileKey, uploadId, parts });
           } catch (partErr) {
