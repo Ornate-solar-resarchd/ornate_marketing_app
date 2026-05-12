@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { requirePermission } from "../middleware/rbac";
 import { upload } from "../middleware/upload";
-/Users/ornateserver/portals/ornate_marketing_app/apps/api/src/routes/upload.tsimport { uploadDocument, registerDocument } from "../services/document.service";
-import { generateS3Key, getSignedPutUrl } from "../services/s3.service";
+import { uploadDocument, registerDocument } from "../services/document.service";
+import {
+  generateS3Key,
+  getSignedPutUrl,
+  initiateMultipart,
+  getSignedUploadPartUrl,
+  completeMultipart,
+  abortMultipart,
+} from "../services/s3.service";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
@@ -306,6 +313,96 @@ router.post(
       logger.error("GDrive import error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "GDrive import failed", code: "GDRIVE_IMPORT_ERROR" });
     }
+  }
+);
+
+// ─── Multipart upload (for files >100 MB, bypassing CF body-size limit) ───
+
+router.post(
+  "/upload/multipart/initiate",
+  uploadLimiter,
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const { companyId, docType, filename, mimeType, sizeBytes } = req.body as {
+        companyId?: string; docType?: string; filename?: string; mimeType?: string; sizeBytes?: number;
+      };
+      if (!companyId || !docType || !filename || !mimeType) {
+        res.status(400).json({ error: "companyId, docType, filename, mimeType required", code: "VALIDATION_ERROR" }); return;
+      }
+      if (!(docType in DOC_TYPES)) {
+        res.status(400).json({ error: "Invalid docType", code: "VALIDATION_ERROR" }); return;
+      }
+      const acceptedExts = DOC_TYPES[docType as DocTypeKey].accept.split(",");
+      const ext = "." + filename.split(".").pop()?.toLowerCase();
+      if (!acceptedExts.includes(ext)) {
+        res.status(400).json({ error: `File type ${ext} not accepted`, code: "VALIDATION_ERROR" }); return;
+      }
+      if (typeof sizeBytes === "number" && sizeBytes > MAX_UPLOAD_BYTES) {
+        res.status(413).json({ error: `Max ${MAX_UPLOAD_BYTES/1024/1024} MB`, code: "FILE_TOO_LARGE" }); return;
+      }
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      if (!company) { res.status(404).json({ error: "Company not found", code: "NOT_FOUND" }); return; }
+      const fileKey = generateS3Key(companyId, docType, filename);
+      const uploadId = await initiateMultipart(fileKey, mimeType);
+      res.json({ fileKey, uploadId });
+    } catch (e) {
+      logger.error("Multipart initiate error:", e);
+      res.status(500).json({ error: "Initiate failed", code: "MULTIPART_INITIATE_ERROR" });
+    }
+  }
+);
+
+router.post(
+  "/upload/multipart/sign-part",
+  uploadLimiter,
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const { fileKey, uploadId, partNumber } = req.body as {
+        fileKey?: string; uploadId?: string; partNumber?: number;
+      };
+      if (!fileKey || !uploadId || typeof partNumber !== "number") {
+        res.status(400).json({ error: "fileKey, uploadId, partNumber required", code: "VALIDATION_ERROR" }); return;
+      }
+      const partUrl = await getSignedUploadPartUrl(fileKey, uploadId, partNumber, 3600);
+      res.json({ partUrl, partNumber });
+    } catch (e) {
+      logger.error("Multipart sign-part error:", e);
+      res.status(500).json({ error: "Sign part failed", code: "MULTIPART_SIGN_ERROR" });
+    }
+  }
+);
+
+router.post(
+  "/upload/multipart/complete",
+  uploadLimiter,
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const { fileKey, uploadId, parts } = req.body as {
+        fileKey?: string; uploadId?: string; parts?: { PartNumber: number; ETag: string }[];
+      };
+      if (!fileKey || !uploadId || !Array.isArray(parts) || parts.length === 0) {
+        res.status(400).json({ error: "fileKey, uploadId, parts[] required", code: "VALIDATION_ERROR" }); return;
+      }
+      await completeMultipart(fileKey, uploadId, parts);
+      res.json({ ok: true, fileKey });
+    } catch (e) {
+      logger.error("Multipart complete error:", e);
+      res.status(500).json({ error: "Complete failed", code: "MULTIPART_COMPLETE_ERROR" });
+    }
+  }
+);
+
+router.post(
+  "/upload/multipart/abort",
+  uploadLimiter,
+  requirePermission("upload"),
+  async (req, res) => {
+    const { fileKey, uploadId } = req.body as { fileKey?: string; uploadId?: string };
+    if (fileKey && uploadId) await abortMultipart(fileKey, uploadId);
+    res.json({ ok: true });
   }
 );
 

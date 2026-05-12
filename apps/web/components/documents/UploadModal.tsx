@@ -169,46 +169,101 @@ export default function UploadModal({
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
     let completedBytes = 0;
 
+    // Files larger than this go through multipart upload (CF caps single
+    // request body at 100 MB; we use 80 MB part size to leave headroom).
+    const MULTIPART_THRESHOLD = 80 * 1024 * 1024;
+    const PART_SIZE = 80 * 1024 * 1024;
+
     try {
       for (const file of files) {
         const mimeType = file.type || "application/octet-stream";
+        let fileKey: string;
 
-        // 1. Ask backend for a presigned PUT URL
-        const { data: presign } = await api.post("/upload/presign", {
-          companyId,
-          docType,
-          filename: file.name,
-          mimeType,
-          sizeBytes: file.size,
-        });
+        if (file.size <= MULTIPART_THRESHOLD) {
+          // ── Single-part path (≤80 MB) ──
+          const { data: presign } = await api.post("/upload/presign", {
+            companyId, docType, filename: file.name, mimeType, sizeBytes: file.size,
+          });
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", presign.putUrl);
+            xhr.setRequestHeader("Content-Type", mimeType);
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable && totalBytes > 0) {
+                const done = completedBytes + e.loaded;
+                setProgress(Math.round((done * 100) / totalBytes));
+              }
+            };
+            xhr.onload = () =>
+              xhr.status >= 200 && xhr.status < 300
+                ? resolve()
+                : reject(new Error(`HTTP ${xhr.status}`));
+            xhr.onerror = () => reject(new Error("Network error"));
+            xhr.send(file);
+          });
+          fileKey = presign.fileKey;
+        } else {
+          // ── Multipart path (>80 MB) ──
+          const { data: init } = await api.post("/upload/multipart/initiate", {
+            companyId, docType, filename: file.name, mimeType, sizeBytes: file.size,
+          });
+          fileKey = init.fileKey;
+          const uploadId = init.uploadId;
+          const totalParts = Math.ceil(file.size / PART_SIZE);
+          const parts: { PartNumber: number; ETag: string }[] = [];
+          let partCompletedBytes = 0;
 
-        // 2. PUT the file directly to MinIO (bytes never touch the API)
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", presign.putUrl);
-          xhr.setRequestHeader("Content-Type", mimeType);
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && totalBytes > 0) {
-              const done = completedBytes + e.loaded;
-              setProgress(Math.round((done * 100) / totalBytes));
+          try {
+            for (let i = 0; i < totalParts; i++) {
+              const partNumber = i + 1;
+              const start = i * PART_SIZE;
+              const end = Math.min(start + PART_SIZE, file.size);
+              const blob = file.slice(start, end);
+
+              const { data: signed } = await api.post("/upload/multipart/sign-part", {
+                fileKey, uploadId, partNumber,
+              });
+
+              const etag = await new Promise<string>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open("PUT", signed.partUrl);
+                xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable && totalBytes > 0) {
+                    const done = completedBytes + partCompletedBytes + e.loaded;
+                    setProgress(Math.round((done * 100) / totalBytes));
+                  }
+                };
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    const tag = (xhr.getResponseHeader("ETag") || "").replace(/"/g, "");
+                    if (!tag) return reject(new Error("Missing ETag from part upload"));
+                    resolve(tag);
+                  } else reject(new Error(`Part ${partNumber} HTTP ${xhr.status}`));
+                };
+                xhr.onerror = () => reject(new Error(`Part ${partNumber} network error`));
+                xhr.send(blob);
+              });
+
+              parts.push({ PartNumber: partNumber, ETag: etag });
+              partCompletedBytes += (end - start);
             }
-          };
-          xhr.onload = () =>
-            xhr.status >= 200 && xhr.status < 300
-              ? resolve()
-              : reject(new Error(`HTTP ${xhr.status}`));
-          xhr.onerror = () => reject(new Error("Network error"));
-          xhr.send(file);
-        });
+
+            await api.post("/upload/multipart/complete", { fileKey, uploadId, parts });
+          } catch (partErr) {
+            // best-effort cleanup
+            try { await api.post("/upload/multipart/abort", { fileKey, uploadId }); } catch {}
+            throw partErr;
+          }
+        }
 
         completedBytes += file.size;
         setProgress(Math.round((completedBytes * 100) / totalBytes));
 
-        // 3. Register the uploaded object in the DB
+        // Register the uploaded object in the DB
         await api.post("/upload/complete", {
           companyId,
           docType,
-          fileKey: presign.fileKey,
+          fileKey,
           originalName: file.name,
           mimeType,
           sizeBytes: file.size,

@@ -3,6 +3,10 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
@@ -86,6 +90,67 @@ export async function getSignedPutUrl(
   });
 
   return getSignedUrl(s3Client, command, { expiresIn });
+}
+
+// ─── Multipart upload helpers ─────────────────────────────────────────
+// Allows uploading files larger than Cloudflare's 100 MB request limit by
+// splitting the file into smaller parts that each pass through CF separately.
+
+export async function initiateMultipart(
+  key: string,
+  mimeType: string
+): Promise<string> {
+  const command = new CreateMultipartUploadCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: mimeType,
+  });
+  const res = await s3Client.send(command);
+  if (!res.UploadId) throw new Error("No UploadId returned from MinIO");
+  return res.UploadId;
+}
+
+export async function getSignedUploadPartUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  expiresIn: number = 3600
+): Promise<string> {
+  const command = new UploadPartCommand({
+    Bucket: BUCKET,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  });
+  return getSignedUrl(s3Client, command, { expiresIn });
+}
+
+export async function completeMultipart(
+  key: string,
+  uploadId: string,
+  parts: { PartNumber: number; ETag: string }[]
+): Promise<void> {
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: BUCKET,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: parts.sort((a, b) => a.PartNumber - b.PartNumber),
+    },
+  });
+  await s3Client.send(command);
+}
+
+export async function abortMultipart(key: string, uploadId: string): Promise<void> {
+  try {
+    await s3Client.send(new AbortMultipartUploadCommand({
+      Bucket: BUCKET,
+      Key: key,
+      UploadId: uploadId,
+    }));
+  } catch (e) {
+    // best-effort
+  }
 }
 
 export async function deleteFromS3(key: string): Promise<void> {
