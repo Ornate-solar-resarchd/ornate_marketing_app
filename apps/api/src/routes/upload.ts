@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requirePermission } from "../middleware/rbac";
 import { upload } from "../middleware/upload";
-import { uploadDocument, registerDocument } from "../services/document.service";
+/Users/ornateserver/portals/ornate_marketing_app/apps/api/src/routes/upload.tsimport { uploadDocument, registerDocument } from "../services/document.service";
 import { generateS3Key, getSignedPutUrl } from "../services/s3.service";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import { prisma } from "../lib/prisma";
@@ -17,7 +17,7 @@ const uploadLimiter = rateLimit({
   message: { error: "Too many uploads. Please try again later.", code: "RATE_LIMITED" },
 });
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+const MAX_UPLOAD_BYTES = 600 * 1024 * 1024; // 600 MB
 
 // POST /api/upload
 router.post(
