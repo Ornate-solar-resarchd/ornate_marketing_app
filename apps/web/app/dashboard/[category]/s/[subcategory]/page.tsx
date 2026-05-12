@@ -11,7 +11,7 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { Building2, ChevronRight, Sparkles, Plus, X, Pencil, Trash2 } from "lucide-react";
 
-const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "compliance", "casestudy"];
+const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "ppt", "compliance", "casestudy"];
 const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 

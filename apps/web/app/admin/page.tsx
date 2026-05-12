@@ -37,7 +37,7 @@ interface SubCategoryRow {
   companies: { id: string; slug: string; label: string }[];
 }
 
-const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "compliance", "casestudy"];
+const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "ppt", "compliance", "casestudy"];
 
 export default function AdminPage() {
   const [tab, setTab] = useState<"users" | "audit" | "manufacturers">("users");
