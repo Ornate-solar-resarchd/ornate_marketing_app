@@ -59,6 +59,44 @@ export async function uploadToS3(
   return `https://${BUCKET}.s3.${process.env.AWS_REGION || "ap-south-1"}.amazonaws.com/${key}`;
 }
 
+// Stream a Web ReadableStream / Node stream into S3 via multipart upload.
+// Memory-efficient: parts upload as bytes arrive. Handles files up to 5 TB.
+export async function uploadStreamToS3(
+  body: NodeJS.ReadableStream | ReadableStream,
+  key: string,
+  mimeType: string
+): Promise<{ fileKey: string; sizeBytes: number }> {
+  const { Upload } = await import("@aws-sdk/lib-storage");
+  const { Readable, PassThrough } = await import("stream");
+
+  const nodeStream: NodeJS.ReadableStream =
+    body instanceof Readable
+      ? body
+      : (Readable.fromWeb(body as unknown as import("stream/web").ReadableStream) as NodeJS.ReadableStream);
+
+  let sizeBytes = 0;
+  const counter = new PassThrough();
+  nodeStream.on("data", (chunk: Buffer) => {
+    sizeBytes += chunk.length;
+  });
+  nodeStream.pipe(counter);
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET,
+      Key: key,
+      Body: counter,
+      ContentType: mimeType,
+    },
+    queueSize: 4,
+    partSize: 8 * 1024 * 1024,
+  });
+
+  await upload.done();
+  return { fileKey: key, sizeBytes };
+}
+
 export async function getSignedViewUrl(
   key: string,
   expiresIn: number = 3600,

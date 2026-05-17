@@ -9,6 +9,7 @@ import {
   getSignedUploadPartUrl,
   completeMultipart,
   abortMultipart,
+  uploadStreamToS3,
 } from "../services/s3.service";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import { prisma } from "../lib/prisma";
@@ -276,27 +277,99 @@ router.post(
 
       const results = await Promise.all(
         gdriveFiles.map(async (gf) => {
-          // Apps Script: ?download=<fileId> returns raw base64 text (not JSON)
+          // Apps Script: ?download=<fileId> returns either:
+          //   - raw base64 text (small files <40MB)                              → buffered upload
+          //   - JSON {success, stream:true, url, accessToken} for large files     → Drive API v3 + streaming
+          //   - JSON {success, redirect:true, url} (legacy public-link path)      → buffered upload via direct URL
+          //   - JSON {success:false, error} on failure
           const downloadRes = await fetch(`${fetcherUrl}?download=${encodeURIComponent(gf.id)}`, {
             redirect: "follow",
           });
           if (!downloadRes.ok) throw new Error(`Failed to download ${gf.name} (HTTP ${downloadRes.status})`);
           const text = await downloadRes.text();
-          // If Apps Script errored, it returns JSON instead of base64
+
+          let mimeType = gf.mimeType;
+          let originalName = gf.name;
+
           if (text.trim().startsWith("{")) {
-            try {
-              const err = JSON.parse(text) as { success?: boolean; error?: string };
-              if (err.success === false) throw new Error(err.error || `Download failed for ${gf.name}`);
-            } catch (e) {
-              if (e instanceof Error && e.message !== `Download failed for ${gf.name}`) throw e;
+            const json = JSON.parse(text) as {
+              success?: boolean;
+              error?: string;
+              stream?: boolean;
+              redirect?: boolean;
+              url?: string;
+              accessToken?: string;
+              name?: string;
+              mimeType?: string;
+            };
+            if (json.success === false) {
+              throw new Error(json.error || `Download failed for ${gf.name}`);
             }
+            if (json.name) originalName = json.name;
+            if (json.mimeType) mimeType = json.mimeType;
+
+            // STREAMING PATH — Drive API v3 + OAuth token, supports up to 600MB+
+            if (json.stream && json.url && json.accessToken) {
+              const fileRes = await fetch(json.url, {
+                headers: { Authorization: `Bearer ${json.accessToken}` },
+                redirect: "follow",
+              });
+              if (!fileRes.ok) {
+                throw new Error(`Drive API failed for ${gf.name} (HTTP ${fileRes.status})`);
+              }
+              if (!fileRes.body) throw new Error(`No response body for ${gf.name}`);
+
+              const fileKey = generateS3Key(companyId, docType, originalName);
+              const { sizeBytes } = await uploadStreamToS3(fileRes.body, fileKey, mimeType);
+              if (sizeBytes === 0) throw new Error(`Empty file received for ${gf.name}`);
+
+              return registerDocument({
+                fileKey,
+                originalName,
+                mimeType,
+                sizeBytes,
+                companyId,
+                docType,
+                uploadedBy: req.user!.userId,
+                uploaderName: req.user!.userId,
+                customName: gdriveFiles.length === 1 && customName ? customName : undefined,
+                tags: tags || [],
+              });
+            }
+
+            // LEGACY REDIRECT PATH — buffered download from public URL
+            if (json.redirect && json.url) {
+              const fileRes = await fetch(json.url, { redirect: "follow" });
+              if (!fileRes.ok) {
+                throw new Error(`Failed to fetch large file ${gf.name} (HTTP ${fileRes.status})`);
+              }
+              const arrayBuf = await fileRes.arrayBuffer();
+              const buf = Buffer.from(arrayBuf);
+              if (buf.length === 0) throw new Error(`Empty file received for ${gf.name}`);
+              return uploadDocument({
+                buffer: buf,
+                originalName,
+                mimeType,
+                sizeBytes: buf.length,
+                companyId,
+                docType,
+                uploadedBy: req.user!.userId,
+                uploaderName: req.user!.userId,
+                customName: gdriveFiles.length === 1 && customName ? customName : undefined,
+                tags: tags || [],
+              });
+            }
+
+            throw new Error(`Unexpected response shape for ${gf.name}`);
           }
+
+          // INLINE BASE64 — small file
           const buffer = Buffer.from(text, "base64");
           if (buffer.length === 0) throw new Error(`Empty file received for ${gf.name}`);
           return uploadDocument({
             buffer,
-            originalName: gf.name,
-            mimeType: gf.mimeType,
+            originalName,
+            mimeType,
             sizeBytes: buffer.length,
             companyId,
             docType,
