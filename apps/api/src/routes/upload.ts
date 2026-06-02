@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requirePermission } from "../middleware/rbac";
 import { upload } from "../middleware/upload";
 import { uploadDocument, registerDocument } from "../services/document.service";
+import { autoTagInBackground } from "../services/auto-tagger.service";
 import {
   generateS3Key,
   getSignedPutUrl,
@@ -101,6 +102,14 @@ router.post(
           })
         )
       );
+
+      // Fire-and-forget auto-tagging via the local Qwen3 model. Only run when
+      // the uploader didn't already supply manual tags.
+      if (!tags || tags.length === 0) {
+        for (const doc of results) {
+          if (doc?.id) autoTagInBackground(doc.id);
+        }
+      }
 
       res.status(201).json({ documents: results });
     } catch (error) {
@@ -229,6 +238,11 @@ router.post(
         customName,
         tags,
       });
+
+      // Auto-tag in background when no manual tags supplied
+      if ((!tags || tags.length === 0) && document?.id) {
+        autoTagInBackground(document.id);
+      }
 
       res.status(201).json({ document });
     } catch (error) {
@@ -380,6 +394,13 @@ router.post(
           });
         })
       );
+
+      // Auto-tag in background when no manual tags supplied
+      if (!tags || tags.length === 0) {
+        for (const doc of results) {
+          if (doc?.id) autoTagInBackground(doc.id);
+        }
+      }
 
       res.status(201).json({ documents: results });
     } catch (error) {

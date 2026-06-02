@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { deleteFromS3 } from "../services/s3.service";
 import { CreateCompanySchema, ROLES } from "@ornate/types";
 import { logger } from "../lib/logger";
+import { backfillUntagged, autoTagDocument } from "../services/auto-tagger.service";
 
 const router: Router = Router();
 
@@ -290,6 +291,55 @@ router.get(
       res.status(500).json({ error: "Failed to fetch audit logs", code: "FETCH_ERROR" });
     }
   }
+);
+
+// ─────────────────────────────────────────────────────────────────────
+// Auto-tagger admin endpoints — drive the local Qwen3 model.
+// POST /admin/tags/backfill?limit=50  → tag N untagged docs (default 50)
+// POST /admin/tags/retag/:documentId  → re-tag one doc (overwrites existing)
+// ─────────────────────────────────────────────────────────────────────
+
+router.post(
+  "/admin/tags/backfill",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    const limit = Math.min(
+      500,
+      Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50),
+    );
+    logger.info(`Auto-tagger backfill requested (limit=${limit})`);
+    // Run in background so the HTTP request returns immediately — backfilling
+    // 500 docs at ~2s each would otherwise time out the client.
+    res.status(202).json({
+      message: `Backfill of up to ${limit} untagged documents started in background. Check logs / DB for progress.`,
+    });
+    backfillUntagged(limit)
+      .then((r) => logger.info(`Backfill done: ${r.tagged}/${r.processed} tagged`))
+      .catch((err) => logger.warn("Backfill error:", err));
+  },
+);
+
+router.post(
+  "/admin/tags/retag/:documentId",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    const id = req.params.documentId;
+    if (!id) {
+      res.status(400).json({ error: "documentId required" });
+      return;
+    }
+    try {
+      await autoTagDocument(id);
+      const fresh = await prisma.document.findUnique({
+        where: { id },
+        select: { id: true, name: true, tags: true },
+      });
+      res.json(fresh);
+    } catch (err) {
+      logger.warn(`Retag failed for ${id}:`, err);
+      res.status(500).json({ error: "Retag failed" });
+    }
+  },
 );
 
 export default router;
