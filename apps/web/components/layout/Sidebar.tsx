@@ -30,7 +30,7 @@ const navItems = [
   { label: "Ornate Products", href: "/dashboard/ornate-products", icon: Sun, section: "categories" },
   { label: "Panels", href: "/dashboard/panels", icon: PanelTop, section: "categories" },
   { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
-  { label: "Energy Storage System", href: "/dashboard/energy-storage-system", icon: Battery, section: "categories" },
+  { label: "OEM Database", href: "/dashboard/oem-database", icon: Battery, section: "categories" },
   { label: "Research & Development", href: "/dashboard/research-and-development", icon: FlaskConical, section: "categories" },
 ];
 
