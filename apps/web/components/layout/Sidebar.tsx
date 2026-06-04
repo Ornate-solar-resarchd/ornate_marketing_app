@@ -15,6 +15,7 @@ import {
   Building2,
   BatteryCharging,
   Battery,
+  FlaskConical,
   Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ const navItems = [
   { label: "Panels", href: "/dashboard/panels", icon: PanelTop, section: "categories" },
   { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
   { label: "Energy Storage System", href: "/dashboard/energy-storage-system", icon: Battery, section: "categories" },
+  { label: "Research & Development", href: "/dashboard/research-and-development", icon: FlaskConical, section: "categories" },
 ];
 
 export default function Sidebar() {
