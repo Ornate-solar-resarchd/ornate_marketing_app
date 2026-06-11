@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, Loader2, MessageCircle, Send, Sparkles, X } from "lucide-react";
+import { Bot, ExternalLink, FileText, Loader2, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -26,6 +26,11 @@ type ChatSource = {
   source: string;
   similarity: number;
   excerpt: string;
+  file_url?: string | null;
+  file_name?: string | null;
+  company?: string | null;
+  doc_type?: string | null;
+  page?: number | null;
 };
 
 type ChatMessage = {
@@ -333,8 +338,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
       {message.sources && message.sources.length > 0 && !isUser && (
         <div className="ml-1 flex flex-wrap gap-1">
-          {message.sources.slice(0, 3).map((s) => (
-            <SourceChip key={s.source} source={s} />
+          {dedupeSources(message.sources).slice(0, 4).map((s, i) => (
+            <SourceChip key={`${s.source}_${i}`} source={s} />
           ))}
         </div>
       )}
@@ -342,32 +347,66 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
+// Collapse multiple chunks from the same document into one chip (a 40-page
+// brochure shouldn't show 8 identical chips). Keyed by file_url || file_name.
+function dedupeSources(sources: ChatSource[]): ChatSource[] {
+  const seen = new Set<string>();
+  const out: ChatSource[] = [];
+  for (const s of sources) {
+    const key = s.file_url || s.file_name || s.source;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
 function SourceChip({ source }: { source: ChatSource }) {
-  // Build a link back into the marketing portal if it's a brand chunk
-  const m = source.source.match(/^marketing:(company|category|subcategory):(.+)$/);
-  let href: string | undefined;
-  let label = source.source;
-  if (m) {
-    const [, kind, slug] = m;
-    label = slug;
-    if (kind === "company") href = `/dashboard/oem-database/${slug}`;
-    if (kind === "category") href = `/dashboard/${slug}`;
+  // Priority 1: a real document file → open it in a new tab.
+  // Priority 2: a brand/category chunk → link to the dashboard page.
+  let href: string | undefined = source.file_url ?? undefined;
+  let opensFile = Boolean(source.file_url);
+  let label =
+    source.file_name ||
+    source.company ||
+    source.source.split(":").pop() ||
+    source.source;
+
+  if (!href) {
+    const m = source.source.match(/^marketing:(company|category|subcategory):(.+)$/);
+    if (m) {
+      const [, kind, slug] = m;
+      label = source.company || slug;
+      if (kind === "company") href = `/dashboard/oem-database/${slug}`;
+      if (kind === "category") href = `/dashboard/${slug}`;
+    }
   }
 
+  // Trim very long filenames for display
+  const shown = label.length > 34 ? label.slice(0, 31) + "…" : label;
+
   const inner = (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#E5E7EB] bg-white px-2 py-0.5 text-[10px] font-medium text-[#6B7280] hover:border-[#E8611A] hover:text-[#E8611A]">
-      <Sparkles className="h-2.5 w-2.5" />
-      {label}
-      <span className="text-[#9CA3AF]">· {Math.round(source.similarity * 100)}%</span>
+    <span
+      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#E5E7EB] bg-white px-2 py-0.5 text-[10px] font-medium text-[#6B7280] hover:border-[#E8611A] hover:text-[#E8611A]"
+      title={source.file_name || source.company || source.source}
+    >
+      {opensFile ? <FileText className="h-2.5 w-2.5 shrink-0" /> : <Sparkles className="h-2.5 w-2.5 shrink-0" />}
+      <span className="truncate">{shown}</span>
+      {opensFile && <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />}
     </span>
   );
 
-  return href ? (
-    <a href={href} className="cursor-pointer">
+  if (!href) return inner;
+
+  // Files open in a new tab; dashboard links stay in-app.
+  return opensFile ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer max-w-[200px]">
       {inner}
     </a>
   ) : (
-    inner
+    <a href={href} className="cursor-pointer max-w-[200px]">
+      {inner}
+    </a>
   );
 }
 
