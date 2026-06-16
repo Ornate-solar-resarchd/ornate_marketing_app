@@ -17,6 +17,7 @@ import {
   Battery,
   FlaskConical,
   Home,
+  Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,6 +33,7 @@ const navItems = [
   { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
   { label: "OEM Database", href: "/dashboard/oem-database", icon: Battery, section: "categories" },
   { label: "Research & Development", href: "/dashboard/research-and-development", icon: FlaskConical, section: "categories" },
+  { label: "Library", href: "/dashboard/library", icon: Library, section: "tools" },
 ];
 
 export default function Sidebar() {
@@ -47,6 +49,7 @@ export default function Sidebar() {
 
   const ornateItems = navItems.filter((i) => i.section === "ornate");
   const categoryItems = navItems.filter((i) => i.section === "categories");
+  const toolItems = navItems.filter((i) => i.section === "tools");
   const dashboardItem = navItems.find((i) => i.section === "main")!;
 
   const renderNavItem = (item: typeof navItems[0], index: number) => (
@@ -121,6 +124,16 @@ export default function Sidebar() {
           </p>
           <div className="space-y-1">
             {categoryItems.map((item, i) => renderNavItem(item, i + 4))}
+          </div>
+        </div>
+
+        {/* Tools */}
+        <div>
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Tools
+          </p>
+          <div className="space-y-1">
+            {toolItems.map((item, i) => renderNavItem(item, i + 10))}
           </div>
         </div>
       </nav>

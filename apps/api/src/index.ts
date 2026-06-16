@@ -12,6 +12,7 @@ import uploadRouter from "./routes/upload";
 import shareRouter from "./routes/share";
 import searchRouter from "./routes/search";
 import adminRouter from "./routes/admin";
+import libraryRouter from "./routes/library";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -50,6 +51,7 @@ app.use("/api", searchRouter);
 app.use("/api", authMiddleware, documentsRouter);
 app.use("/api", authMiddleware, uploadRouter);
 app.use("/api", authMiddleware, adminRouter);
+app.use("/api", authMiddleware, libraryRouter);
 
 // Error handler
 app.use(errorHandler);
