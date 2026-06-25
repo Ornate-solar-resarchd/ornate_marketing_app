@@ -1,0 +1,73 @@
+name: Jira Auto Ticket
+
+on:
+  push:
+
+jobs:
+  create-ticket:
+    runs-on: ubuntu-latest
+    if: github.actor == 'priyank' || github.actor == 'cool2568'
+    steps:
+      - name: Create Jira Ticket
+        env:
+          JIRA_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+          COMMIT_TS: ${{ github.event.head_commit.timestamp }}
+        run: |
+          REPO="${{ github.repository }}"
+          REPO_NAME="${REPO##*/}"
+          BRANCH="${{ github.ref_name }}"
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          COMMIT_URL="https://github.com/$REPO/commit/$SHA"
+          SUMMARY=$(echo "$COMMIT_MSG" | head -1 | cut -c1-200)
+
+          PAYLOAD=$(jq -n \
+            --arg summary "[$REPO_NAME] $SUMMARY" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHORT_SHA" \
+            --arg url "$COMMIT_URL" \
+            --arg author "$COMMIT_AUTHOR" \
+            --arg ts "$COMMIT_TS" \
+            --arg label "$REPO_NAME" \
+            '{
+              fields: {
+                project: { key: "DEV" },
+                summary: $summary,
+                description: {
+                  type: "doc",
+                  version: 1,
+                  content: [
+                    { type: "paragraph", content: [{ type: "text", text: ("Repo: " + $repo) }] },
+                    { type: "paragraph", content: [{ type: "text", text: ("Branch: " + $branch) }] },
+                    { type: "paragraph", content: [{ type: "text", text: ("Commit: " + $sha) }] },
+                    { type: "paragraph", content: [{ type: "text", text: ("Author: " + $author) }] },
+                    { type: "paragraph", content: [{ type: "text", text: ("Time: " + $ts) }] },
+                    { type: "paragraph", content: [{ type: "text", text: ("URL: " + $url) }] }
+                  ]
+                },
+                issuetype: { name: "Task" },
+                labels: ["auto-commit", $label]
+              }
+            }')
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -u "priyank@ornatesolar.in:$JIRA_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://ornatesolar.atlassian.net/rest/api/3/issue" \
+            -d "$PAYLOAD")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            ISSUE_KEY=$(echo "$BODY" | jq -r '.key')
+            echo "Jira ticket created: $ISSUE_KEY"
+            echo "https://ornatesolar.atlassian.net/browse/$ISSUE_KEY"
+          else
+            echo "Failed to create Jira ticket (HTTP $HTTP_CODE)"
+            echo "$BODY"
+            exit 1
+          fi
