@@ -3,7 +3,7 @@ import {
   generateS3Key,
   uploadToS3,
   deleteFromS3,
-  getSignedViewUrl,
+  getPublicUrl,
 } from "./s3.service";
 import { v4 as uuidv4 } from "uuid";
 import { autoTagFile } from "./ai-tagger.service";
@@ -295,10 +295,7 @@ export async function getSharedDocument(token: string) {
     throw new Error("Share link has expired");
   }
 
-  const signedUrl = await getSignedViewUrl(document.fileKey, 86400, {
-    filename: document.originalName,
-    mimeType: document.mimeType,
-  });
+  const signedUrl = getPublicUrl(document.fileKey);
 
   return { signedUrl, document };
 }
@@ -309,17 +306,11 @@ export async function getDocumentsByCompany(companyId: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  // Generate short-lived signed URLs for thumbnails
-  const docsWithUrls = await Promise.all(
-    documents.map(async (doc) => {
-      try {
-        const thumbnailUrl = await getSignedViewUrl(doc.fileKey, 3600);
-        return { ...doc, fileUrl: thumbnailUrl };
-      } catch {
-        return doc;
-      }
-    })
-  );
+  // Use permanent public URLs — bucket has "download" (public read) policy
+  const docsWithUrls = documents.map((doc) => ({
+    ...doc,
+    fileUrl: getPublicUrl(doc.fileKey),
+  }));
 
   const grouped: Record<string, typeof docsWithUrls> = {};
   for (const doc of docsWithUrls) {
@@ -341,7 +332,7 @@ export async function getDocumentViewUrl(documentId: string, userId: string) {
     throw new Error("Document not found");
   }
 
-  const signedUrl = await getSignedViewUrl(document.fileKey, 3600);
+  const signedUrl = getPublicUrl(document.fileKey);
 
   await prisma.auditLog.create({
     data: {

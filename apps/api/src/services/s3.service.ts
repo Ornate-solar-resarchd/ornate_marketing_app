@@ -104,6 +104,14 @@ export async function uploadStreamToS3(
   return { fileKey: key, sizeBytes };
 }
 
+// Returns a permanent public URL for a file in this bucket.
+// Works because ornate-nopa has a "download" (public read) MinIO policy.
+// Eliminates async MinIO API calls for every page load — use this for viewing.
+export function getPublicUrl(key: string): string {
+  const endpoint = process.env.AWS_ENDPOINT_URL || `https://s3.${process.env.AWS_REGION || "ap-south-1"}.amazonaws.com`;
+  return `${endpoint}/${BUCKET}/${key}`;
+}
+
 export async function getSignedViewUrl(
   key: string,
   expiresIn: number = _VIEW_TTL_S,
