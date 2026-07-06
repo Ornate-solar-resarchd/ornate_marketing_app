@@ -11,6 +11,13 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 
+// In-memory cache for presigned view URLs.
+// Key: "<fileKey>|<download>|<mimeType>" → { url, expiresAt (ms) }
+// Avoids regenerating a MinIO presigned URL on every page load when nothing changed.
+const _urlCache = new Map<string, { url: string; expiresAt: number }>();
+const _VIEW_TTL_S = 86400; // 24 hours — long enough that the cache is useful
+const _CACHE_MARGIN_S = 300; // evict 5 min before real expiry to avoid stale URLs
+
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || "ap-south-1",
   credentials: {
@@ -99,10 +106,19 @@ export async function uploadStreamToS3(
 
 export async function getSignedViewUrl(
   key: string,
-  expiresIn: number = 3600,
+  expiresIn: number = _VIEW_TTL_S,
   options: { filename?: string; mimeType?: string; download?: boolean } = {}
 ): Promise<string> {
   const { filename, mimeType, download = false } = options;
+
+  // Cache key encodes everything that affects the URL.
+  const cacheKey = `${key}|${download ? "dl" : "view"}|${mimeType ?? ""}|${filename ?? ""}`;
+  const cached = _urlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+
+  const ttl = Math.max(expiresIn, _VIEW_TTL_S); // never generate shorter-lived URLs than 24h
   const disposition = download
     ? `attachment${filename ? `; filename="${filename}"` : ""}`
     : `inline${filename ? `; filename="${filename}"` : ""}`;
@@ -113,7 +129,9 @@ export async function getSignedViewUrl(
     ...(mimeType ? { ResponseContentType: mimeType } : {}),
   });
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  const url = await getSignedUrl(s3Client, command, { expiresIn: ttl });
+  _urlCache.set(cacheKey, { url, expiresAt: Date.now() + (ttl - _CACHE_MARGIN_S) * 1000 });
+  return url;
 }
 
 export async function getSignedPutUrl(
@@ -198,4 +216,8 @@ export async function deleteFromS3(key: string): Promise<void> {
   });
 
   await s3Client.send(command);
+  // Evict all cached URLs for this key so a subsequent fetch doesn't return a URL for a deleted object.
+  for (const k of _urlCache.keys()) {
+    if (k.startsWith(key + "|")) _urlCache.delete(k);
+  }
 }
