@@ -5,61 +5,53 @@ import { usePathname } from "next/navigation";
 import { useUser } from "@/lib/auth-context";
 import {
   LayoutDashboard,
-  Sun,
-  PanelTop,
-  Zap,
   Shield,
   Menu,
   X,
   ChevronRight,
-  Building2,
-  BatteryCharging,
-  Battery,
-  FlaskConical,
-  Home,
   Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Role } from "@ornate/types";
+import api from "@/lib/api";
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "main" },
-  { label: "About Ornate Solar", href: "/dashboard/about-ornate-solar", icon: Building2, section: "ornate" },
-  { label: "UnityESS", href: "/dashboard/unityess", icon: BatteryCharging, section: "ornate" },
-  { label: "Ornate Inroof", href: "/dashboard/ornate-inroof", icon: Home, section: "ornate" },
-  { label: "Ornate Products", href: "/dashboard/ornate-products", icon: Sun, section: "categories" },
-  { label: "Panels", href: "/dashboard/panels", icon: PanelTop, section: "categories" },
-  { label: "Inverters", href: "/dashboard/inverters", icon: Zap, section: "categories" },
-  { label: "OEM Database", href: "/dashboard/oem-database", icon: Battery, section: "categories" },
-  { label: "Research & Development", href: "/dashboard/research-and-development", icon: FlaskConical, section: "categories" },
-  { label: "Library", href: "/dashboard/library", icon: Library, section: "tools" },
-];
+interface Category {
+  id: string;
+  slug: string;
+  label: string;
+  icon: string;
+  section: string;
+  order: number;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const role = (user?.publicMetadata?.role as Role) || "viewer";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    api.get("/categories").then((r) => setCategories(r.data)).catch(() => {});
+  }, []);
+
+  const ornateItems = categories.filter((c) => c.section === "ornate");
+  const partnerItems = categories.filter((c) => c.section === "partners");
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   };
 
-  const ornateItems = navItems.filter((i) => i.section === "ornate");
-  const categoryItems = navItems.filter((i) => i.section === "categories");
-  const toolItems = navItems.filter((i) => i.section === "tools");
-  const dashboardItem = navItems.find((i) => i.section === "main")!;
-
-  const renderNavItem = (item: typeof navItems[0], index: number) => (
+  const renderCatItem = (cat: Category, index: number) => (
     <Link
-      key={item.href}
-      href={item.href}
+      key={cat.slug}
+      href={`/dashboard/${cat.slug}`}
       onClick={() => setMobileOpen(false)}
       className={cn(
         "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-        isActive(item.href)
+        isActive(`/dashboard/${cat.slug}`)
           ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF5F0] text-[#E8611A] shadow-sm"
           : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
       )}
@@ -67,16 +59,16 @@ export default function Sidebar() {
     >
       <div
         className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
-          isActive(item.href)
-            ? "bg-[#E8611A] text-white shadow-md shadow-orange-200"
-            : "bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
+          "flex h-8 w-8 items-center justify-center rounded-lg text-base transition-all duration-200",
+          isActive(`/dashboard/${cat.slug}`)
+            ? "bg-[#E8611A] shadow-md shadow-orange-200"
+            : "bg-muted/80 group-hover:bg-muted"
         )}
       >
-        <item.icon className="h-4 w-4" />
+        {cat.icon}
       </div>
-      <span className="flex-1">{item.label}</span>
-      {isActive(item.href) && (
+      <span className="flex-1">{cat.label}</span>
+      {isActive(`/dashboard/${cat.slug}`) && (
         <ChevronRight className="h-4 w-4 text-[#E8611A]/60" />
       )}
     </Link>
@@ -104,28 +96,51 @@ export default function Sidebar() {
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Navigation
           </p>
-          {renderNavItem(dashboardItem, 0)}
+          <Link
+            href="/dashboard"
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              pathname === "/dashboard"
+                ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF5F0] text-[#E8611A] shadow-sm"
+                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+            )}
+          >
+            <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
+              pathname === "/dashboard"
+                ? "bg-[#E8611A] text-white shadow-md shadow-orange-200"
+                : "bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
+            )}>
+              <LayoutDashboard className="h-4 w-4" />
+            </div>
+            <span className="flex-1">Dashboard</span>
+            {pathname === "/dashboard" && <ChevronRight className="h-4 w-4 text-[#E8611A]/60" />}
+          </Link>
         </div>
 
         {/* Ornate Solar Section */}
-        <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Ornate Solar
-          </p>
-          <div className="space-y-1">
-            {ornateItems.map((item, i) => renderNavItem(item, i + 1))}
+        {ornateItems.length > 0 && (
+          <div>
+            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Ornate Solar
+            </p>
+            <div className="space-y-1">
+              {ornateItems.map((cat, i) => renderCatItem(cat, i + 1))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Partners / Categories */}
-        <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Partners
-          </p>
-          <div className="space-y-1">
-            {categoryItems.map((item, i) => renderNavItem(item, i + 4))}
+        {partnerItems.length > 0 && (
+          <div>
+            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Partners
+            </p>
+            <div className="space-y-1">
+              {partnerItems.map((cat, i) => renderCatItem(cat, i + 4))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tools */}
         <div>
@@ -133,7 +148,26 @@ export default function Sidebar() {
             Tools
           </p>
           <div className="space-y-1">
-            {toolItems.map((item, i) => renderNavItem(item, i + 10))}
+            <Link
+              href="/dashboard/library"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                isActive("/dashboard/library")
+                  ? "bg-gradient-to-r from-[#FEF0E8] to-[#FFF5F0] text-[#E8611A] shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              )}
+            >
+              <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
+                isActive("/dashboard/library")
+                  ? "bg-[#E8611A] text-white shadow-md shadow-orange-200"
+                  : "bg-muted/80 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
+              )}>
+                <Library className="h-4 w-4" />
+              </div>
+              <span className="flex-1">Library</span>
+              {isActive("/dashboard/library") && <ChevronRight className="h-4 w-4 text-[#E8611A]/60" />}
+            </Link>
           </div>
         </div>
       </nav>
@@ -154,14 +188,11 @@ export default function Sidebar() {
                 : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             )}
           >
-            <div
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
-                pathname.startsWith("/admin")
-                  ? "bg-purple-600 text-white shadow-md shadow-purple-200"
-                  : "bg-muted/80 text-muted-foreground group-hover:bg-muted"
-              )}
-            >
+            <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
+              pathname.startsWith("/admin")
+                ? "bg-purple-600 text-white shadow-md shadow-purple-200"
+                : "bg-muted/80 text-muted-foreground group-hover:bg-muted"
+            )}>
               <Shield className="h-4 w-4" />
             </div>
             <span className="flex-1">Admin Panel</span>

@@ -14,6 +14,7 @@ model Category {
   label         String
   icon          String
   order         Int           @default(0)
+  section       String        @default("partners")
   companies     Company[]
   subCategories SubCategory[]
   createdAt     DateTime      @default(now())

@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ROLES, type Role } from "@ornate/types";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Users, FileText, Shield, Activity, Sparkles, Factory, Plus } from "lucide-react";
+import { Users, FileText, Shield, Activity, Sparkles, Factory, Plus, FolderPlus, Trash2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -29,6 +29,16 @@ interface AuditLog {
   createdAt: string;
 }
 
+interface CategoryRow {
+  id: string;
+  slug: string;
+  label: string;
+  icon: string;
+  section: string;
+  order: number;
+  _count: { companies: number; subCategories: number };
+}
+
 interface SubCategoryRow {
   id: string;
   slug: string;
@@ -40,11 +50,18 @@ interface SubCategoryRow {
 const DEFAULT_DOC_TYPES = ["brochure", "datasheet", "images", "ppt", "compliance", "casestudy"];
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"users" | "audit" | "manufacturers">("users");
+  const [tab, setTab] = useState<"users" | "audit" | "manufacturers" | "categories">("users");
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategoryRow[]>([]);
+  const [allCategories, setAllCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // New category form
+  const [catLabel, setCatLabel] = useState("");
+  const [catIcon, setCatIcon] = useState("📦");
+  const [catSection, setCatSection] = useState<"partners" | "ornate">("partners");
+  const [catSubmitting, setCatSubmitting] = useState(false);
 
   // New manufacturer form state
   const [mfName, setMfName] = useState("");
@@ -62,28 +79,14 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [usersRes, logsRes, esRes] = await Promise.all([
+      const [usersRes, logsRes, catsRes] = await Promise.all([
         api.get("/admin/users"),
         api.get("/admin/audit-logs?limit=50"),
-        api.get("/categories/energy-storage-system"),
+        api.get("/admin/categories"),
       ]);
       setUsers(usersRes.data);
       setAuditLogs(logsRes.data);
-      // Build sub-category rows with their companies
-      const cat = esRes.data;
-      const rows: SubCategoryRow[] = await Promise.all(
-        (cat.subCategories ?? []).map(async (sc: any) => {
-          const full = await api.get(`/subcategories/${sc.slug}`);
-          return {
-            id: full.data.id,
-            slug: full.data.slug,
-            label: full.data.label,
-            category: full.data.category,
-            companies: full.data.companies ?? [],
-          };
-        })
-      );
-      setSubCategories(rows);
+      setAllCategories(catsRes.data);
     } catch {
       toast.error("Failed to load admin data");
     } finally {
@@ -94,14 +97,45 @@ export default function AdminPage() {
   const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catLabel.trim()) { toast.error("Category name is required"); return; }
+    setCatSubmitting(true);
+    try {
+      await api.post("/admin/categories", { label: catLabel.trim(), icon: catIcon, section: catSection });
+      toast.success(`Category "${catLabel}" added — it now appears in the sidebar`);
+      setCatLabel(""); setCatIcon("📦");
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || "Failed to create category");
+    } finally {
+      setCatSubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat: CategoryRow) => {
+    if (cat._count.companies > 0) {
+      toast.error(`Remove all ${cat._count.companies} companies from "${cat.label}" first`);
+      return;
+    }
+    if (!confirm(`Delete category "${cat.label}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/admin/categories/${cat.id}`);
+      toast.success(`"${cat.label}" deleted`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || "Failed to delete category");
+    }
+  };
+
   const handleAddManufacturer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mfName.trim() || !mfSubCategoryId) {
-      toast.error("Name and sub-category are required");
+      toast.error("Name and category are required");
       return;
     }
-    const sub = subCategories.find((s) => s.id === mfSubCategoryId);
-    if (!sub) return;
+    const cat = allCategories.find((c) => c.id === mfSubCategoryId);
+    if (!cat) return;
     setMfSubmitting(true);
     try {
       await api.post("/admin/companies", {
@@ -112,14 +146,13 @@ export default function AdminPage() {
         logoUrl: mfLogoUrl.trim() || "https://ornatesolar.com/wp-content/uploads/2023/10/Ornate-logo-02-e1697005298472.png",
         websiteUrl: mfWebsite.trim() || "https://ornatesolar.com",
         docTypes: DEFAULT_DOC_TYPES,
-        categoryId: sub.category.id,
-        subCategoryId: sub.id,
+        categoryId: cat.id,
       });
-      toast.success(`Manufacturer "${mfName}" added under ${sub.label}`);
+      toast.success(`"${mfName}" added under ${cat.label}`);
       setMfName(""); setMfLogoUrl(""); setMfWebsite("");
       fetchData();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || "Failed to create manufacturer");
+      toast.error(err?.response?.data?.error || "Failed to create company");
     } finally {
       setMfSubmitting(false);
     }
@@ -207,6 +240,17 @@ export default function AdminPage() {
           Manufacturers
         </button>
         <button
+          onClick={() => setTab("categories")}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+            tab === "categories"
+              ? "bg-[#E8611A] text-white shadow-md shadow-orange-200/30 scale-105"
+              : "bg-white border border-border/50 text-muted-foreground hover:text-foreground hover:border-[#E8611A]/30"
+          }`}
+        >
+          <FolderPlus className="h-4 w-4" />
+          Categories
+        </button>
+        <button
           onClick={() => setTab("audit")}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
             tab === "audit"
@@ -230,7 +274,7 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleAddManufacturer} className="space-y-3">
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sub-category *</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category *</label>
                 <select
                   required
                   value={mfSubCategoryId}
@@ -238,8 +282,8 @@ export default function AdminPage() {
                   className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
                 >
                   <option value="">— Select —</option>
-                  {subCategories.map((s) => (
-                    <option key={s.id} value={s.id}>{s.category.label} → {s.label}</option>
+                  {allCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
                   ))}
                 </select>
               </div>
@@ -303,32 +347,104 @@ export default function AdminPage() {
             </form>
           </div>
 
-          {/* Existing list grouped by sub-category */}
+          {/* Existing list grouped by category */}
           <div className="rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold mb-4">Existing Manufacturers</h2>
-            {subCategories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sub-categories yet.</p>
+            <h2 className="text-base font-bold mb-4">Companies by Category</h2>
+            {allCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No categories yet.</p>
             ) : (
-              <div className="space-y-4">
-                {subCategories.map((sc) => (
-                  <div key={sc.id}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#E8611A]">{sc.label}</span>
-                      <Badge variant="outline" className="text-[10px]">{sc.companies.length}</Badge>
+              <div className="space-y-3">
+                {allCategories.map((cat) => (
+                  <div key={cat.id} className="rounded-xl border border-border/40 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{cat.icon}</span>
+                      <span className="text-sm font-semibold text-foreground">{cat.label}</span>
+                      <Badge variant="outline" className="text-[10px]">{cat._count.companies} companies</Badge>
                     </div>
-                    {sc.companies.length === 0 ? (
-                      <p className="text-xs text-muted-foreground ml-1">— No manufacturers yet</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {sc.companies.map((c) => (
-                          <li key={c.id} className="ml-1 text-sm text-foreground">• {c.label}</li>
-                        ))}
-                      </ul>
-                    )}
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Categories Tab */}
+      {tab === "categories" && (
+        <div className="mt-5 grid gap-6 lg:grid-cols-2 animate-fade-in-up">
+          {/* Add form */}
+          <div className="rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <FolderPlus className="h-4 w-4 text-[#E8611A]" />
+              <h2 className="text-base font-bold">Add Sidebar Category</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              New categories appear instantly in the sidebar for all users. Companies you add under them will show as cards on the category page.
+            </p>
+            <form onSubmit={handleAddCategory} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category Name *</label>
+                <input
+                  required
+                  type="text"
+                  value={catLabel}
+                  onChange={(e) => setCatLabel(e.target.value)}
+                  placeholder="e.g. Batteries, Mounting, Software"
+                  className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none focus:ring-1 focus:ring-[#E8611A]/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Icon (emoji)</label>
+                  <input
+                    type="text"
+                    value={catIcon}
+                    onChange={(e) => setCatIcon(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sidebar Section</label>
+                  <select
+                    value={catSection}
+                    onChange={(e) => setCatSection(e.target.value as "partners" | "ornate")}
+                    className="mt-1 w-full rounded-xl border border-border/50 px-3 py-2 text-sm focus:border-[#E8611A] focus:outline-none"
+                  >
+                    <option value="partners">Partners</option>
+                    <option value="ornate">Ornate Solar</option>
+                  </select>
+                </div>
+              </div>
+              <Button type="submit" disabled={catSubmitting} className="w-full bg-[#E8611A] hover:bg-[#D4550F]">
+                {catSubmitting ? "Adding..." : "Add Category"}
+              </Button>
+            </form>
+          </div>
+
+          {/* Existing categories */}
+          <div className="rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-bold mb-4">All Categories ({allCategories.length})</h2>
+            <div className="space-y-2">
+              {allCategories.map((cat) => (
+                <div key={cat.id} className="flex items-center gap-3 rounded-xl border border-border/40 p-3">
+                  <span className="text-xl w-8 text-center">{cat.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-foreground truncate">{cat.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {cat.section === "ornate" ? "Ornate Solar" : "Partners"} · {cat._count.companies} companies
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteCategory(cat)}
+                    disabled={cat._count.companies > 0}
+                    title={cat._count.companies > 0 ? "Remove all companies first" : "Delete category"}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

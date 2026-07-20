@@ -200,6 +200,115 @@ router.delete(
   }
 );
 
+// ─── Categories CRUD ─────────────────────────────────────────────────
+
+// GET /api/admin/categories — List all categories with company + subcategory counts
+router.get(
+  "/admin/categories",
+  requirePermission("manage_companies"),
+  async (_req, res) => {
+    try {
+      const categories = await prisma.category.findMany({
+        orderBy: { order: "asc" },
+        include: {
+          _count: { select: { companies: true, subCategories: true } },
+        },
+      });
+      res.json(categories);
+    } catch (error) {
+      logger.error("Error listing categories:", error);
+      res.status(500).json({ error: "Failed to list categories", code: "FETCH_ERROR" });
+    }
+  }
+);
+
+// POST /api/admin/categories — Create new category
+router.post(
+  "/admin/categories",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      const { label, icon, section, order } = req.body as {
+        label?: string;
+        icon?: string;
+        section?: string;
+        order?: number;
+      };
+      if (!label || !label.trim()) {
+        res.status(400).json({ error: "label is required", code: "VALIDATION_ERROR" });
+        return;
+      }
+      const slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const maxOrder = await prisma.category.aggregate({ _max: { order: true } });
+      const category = await prisma.category.create({
+        data: {
+          slug,
+          label: label.trim(),
+          icon: icon || "📦",
+          section: section || "partners",
+          order: order ?? (maxOrder._max.order ?? 0) + 1,
+        },
+      });
+      res.status(201).json(category);
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        res.status(409).json({ error: "A category with that name already exists", code: "CONFLICT" });
+        return;
+      }
+      logger.error("Error creating category:", error);
+      res.status(500).json({ error: "Failed to create category", code: "CREATE_ERROR" });
+    }
+  }
+);
+
+// PATCH /api/admin/categories/:id — Edit category
+router.patch(
+  "/admin/categories/:id",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      const { label, icon, section, order } = req.body;
+      const data: Record<string, unknown> = {};
+      if (label) { data.label = label.trim(); data.slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+      if (icon !== undefined) data.icon = icon;
+      if (section !== undefined) data.section = section;
+      if (order !== undefined) data.order = order;
+      const category = await prisma.category.update({
+        where: { id: req.params.id as string },
+        data,
+      });
+      res.json(category);
+    } catch (error) {
+      logger.error("Error updating category:", error);
+      res.status(500).json({ error: "Failed to update category", code: "UPDATE_ERROR" });
+    }
+  }
+);
+
+// DELETE /api/admin/categories/:id — Delete category (only if empty)
+router.delete(
+  "/admin/categories/:id",
+  requirePermission("manage_companies"),
+  async (req, res) => {
+    try {
+      const id = req.params.id as string;
+      const count = await prisma.company.count({ where: { categoryId: id } });
+      if (count > 0) {
+        res.status(409).json({
+          error: `Cannot delete: category has ${count} company/companies. Remove them first.`,
+          code: "CONFLICT",
+        });
+        return;
+      }
+      await prisma.category.delete({ where: { id } });
+      res.json({ message: "Category deleted" });
+    } catch (error) {
+      logger.error("Error deleting category:", error);
+      res.status(500).json({ error: "Failed to delete category", code: "DELETE_ERROR" });
+    }
+  }
+);
+
 // ─── Sub-Categories CRUD ──────────────────────────────────────────────
 
 // POST /api/admin/subcategories — Create new sub-category
