@@ -22,6 +22,8 @@ interface FileGridProps {
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
   onViewVersions?: (id: string) => void;
+  onRename?: (id: string) => void;
+  onMove?: (id: string) => void;
 }
 
 export default function FileGrid({
@@ -31,6 +33,8 @@ export default function FileGrid({
   onShare,
   onDelete,
   onViewVersions,
+  onRename,
+  onMove,
 }: FileGridProps) {
   if (documents.length === 0) {
     return (
@@ -57,6 +61,8 @@ export default function FileGrid({
           onShare={onShare}
           onDelete={onDelete}
           onViewVersions={onViewVersions}
+          onRename={onRename}
+          onMove={onMove}
         />
       ))}
     </div>

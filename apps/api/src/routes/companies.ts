@@ -67,6 +67,26 @@ router.get("/subcategories/:slug", async (req, res) => {
   }
 });
 
+// GET /companies — flat list of all companies (used by the Move dialog)
+router.get("/companies", async (_req, res) => {
+  try {
+    const companies = await prisma.company.findMany({
+      orderBy: { label: "asc" },
+      select: {
+        id: true,
+        label: true,
+        icon: true,
+        docTypes: true,
+        category: { select: { label: true } },
+      },
+    });
+    res.json(companies);
+  } catch (error) {
+    logger.error("Error fetching companies:", error);
+    res.status(500).json({ error: "Failed to fetch companies", code: "FETCH_ERROR" });
+  }
+});
+
 router.get("/companies/:id", async (req, res) => {
   try {
     const company = await prisma.company.findUnique({

@@ -253,6 +253,99 @@ export async function deleteDocument(
   return document;
 }
 
+export async function renameDocument(
+  documentId: string,
+  name: string,
+  userId: string,
+  userRole: string
+) {
+  const document = await prisma.document.findUnique({ where: { id: documentId } });
+  if (!document) {
+    throw new Error("Document not found");
+  }
+  if (
+    userRole !== "super_admin" &&
+    userRole !== "admin" &&
+    document.uploadedBy !== userId
+  ) {
+    throw new Error("Cannot rename documents uploaded by other users");
+  }
+
+  const updated = await prisma.document.update({
+    where: { id: documentId },
+    data: { name },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: "rename",
+      docId: documentId,
+      companyId: document.companyId,
+      meta: { from: document.name, to: name },
+    },
+  });
+
+  return updated;
+}
+
+export async function moveDocument(
+  documentId: string,
+  target: { companyId?: string; docType?: string },
+  userId: string,
+  userRole: string
+) {
+  const document = await prisma.document.findUnique({ where: { id: documentId } });
+  if (!document) {
+    throw new Error("Document not found");
+  }
+  if (
+    userRole !== "super_admin" &&
+    userRole !== "admin" &&
+    document.uploadedBy !== userId
+  ) {
+    throw new Error("Cannot move documents uploaded by other users");
+  }
+
+  const targetCompanyId = target.companyId || document.companyId;
+  const targetDocType = target.docType || document.docType;
+
+  // Nothing actually changed.
+  if (targetCompanyId === document.companyId && targetDocType === document.docType) {
+    return document;
+  }
+
+  const company = await prisma.company.findUnique({ where: { id: targetCompanyId } });
+  if (!company) {
+    throw new Error("Target company not found");
+  }
+  if (!company.docTypes.includes(targetDocType)) {
+    throw new Error("That section does not exist in the target company");
+  }
+
+  const updated = await prisma.document.update({
+    where: { id: documentId },
+    data: { companyId: targetCompanyId, docType: targetDocType },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: "move",
+      docId: documentId,
+      companyId: updated.companyId,
+      meta: {
+        fromCompany: document.companyId,
+        toCompany: updated.companyId,
+        fromDocType: document.docType,
+        toDocType: updated.docType,
+      },
+    },
+  });
+
+  return updated;
+}
+
 export async function generateShareLink(documentId: string, userId: string) {
   const shareToken = uuidv4();
   const shareExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);

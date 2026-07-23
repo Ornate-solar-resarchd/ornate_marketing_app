@@ -5,6 +5,8 @@ import {
   getDocumentsByCompany,
   getDocumentViewUrl,
   deleteDocument,
+  renameDocument,
+  moveDocument,
 } from "../services/document.service";
 import { logger } from "../lib/logger";
 
@@ -89,6 +91,64 @@ router.get("/documents/:id/versions", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch versions", code: "FETCH_ERROR" });
   }
 });
+
+// PATCH /documents/:id/rename — change a document's display name
+router.patch(
+  "/documents/:id/rename",
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      if (!name) {
+        res.status(400).json({ error: "Name is required", code: "VALIDATION_ERROR" });
+        return;
+      }
+      const document = await renameDocument(
+        req.params.id as string,
+        name,
+        req.user!.userId,
+        req.user!.role
+      );
+      res.json({ message: "Document renamed", document });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Error renaming document:", error);
+      const status =
+        message === "Document not found" ? 404 : message.includes("Cannot rename") ? 403 : 500;
+      res.status(status).json({ error: message, code: "RENAME_ERROR" });
+    }
+  }
+);
+
+// PATCH /documents/:id/move — move to a different company and/or section
+router.patch(
+  "/documents/:id/move",
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const companyId = typeof req.body?.companyId === "string" ? req.body.companyId : undefined;
+      const docType = typeof req.body?.docType === "string" ? req.body.docType : undefined;
+      const document = await moveDocument(
+        req.params.id as string,
+        { companyId, docType },
+        req.user!.userId,
+        req.user!.role
+      );
+      res.json({ message: "Document moved", document });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Error moving document:", error);
+      const status = message.includes("not found")
+        ? 404
+        : message.includes("Cannot move")
+          ? 403
+          : message.includes("section does not exist")
+            ? 400
+            : 500;
+      res.status(status).json({ error: message, code: "MOVE_ERROR" });
+    }
+  }
+);
 
 router.delete(
   "/documents/:id",

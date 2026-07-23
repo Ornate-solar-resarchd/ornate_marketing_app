@@ -12,6 +12,8 @@ import FileViewer from "@/components/documents/FileViewer";
 import UploadModal from "@/components/documents/UploadModal";
 import ShareModal from "@/components/documents/ShareModal";
 import VersionHistory from "@/components/documents/VersionHistory";
+import RenameModal from "@/components/documents/RenameModal";
+import MoveModal from "@/components/documents/MoveModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import api from "@/lib/api";
@@ -59,6 +61,17 @@ export default function CompanyDetailPage() {
   const [shareDocName, setShareDocName] = useState("");
   const [versionDocId, setVersionDocId] = useState<string | null>(null);
   const [versionDocName, setVersionDocName] = useState("");
+  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{ id: string; docType: string } | null>(null);
+
+  // Find a document (and the section it currently lives in) by id.
+  const findDoc = (docId: string): { doc: DocumentData; docType: string } | null => {
+    for (const [dt, docs] of Object.entries(documents)) {
+      const doc = docs.find((d) => d.id === docId);
+      if (doc) return { doc, docType: dt };
+    }
+    return null;
+  };
 
   const fetchData = async () => {
     try {
@@ -145,6 +158,30 @@ export default function CompanyDetailPage() {
       fetchData();
     } catch {
       toast.error("Failed to delete file");
+    }
+  };
+
+  const handleRename = (docId: string) => {
+    const found = findDoc(docId);
+    if (found) setRenameTarget({ id: docId, name: found.doc.name });
+  };
+
+  const handleMove = (docId: string) => {
+    const found = findDoc(docId);
+    if (found) setMoveTarget({ id: docId, docType: found.docType });
+  };
+
+  // Drag-and-drop: a file card dropped onto another section → move (change docType).
+  const handleMoveToSection = async (docId: string, targetDocType: string) => {
+    const found = findDoc(docId);
+    if (!found || found.docType === targetDocType) return;
+    try {
+      await api.patch(`/documents/${docId}/move`, { docType: targetDocType });
+      toast.success(`Moved to ${DOC_TYPES[targetDocType as DocTypeKey]?.label ?? targetDocType}`);
+      fetchData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg || "Failed to move file");
     }
   };
 
@@ -263,6 +300,9 @@ export default function CompanyDetailPage() {
               onDelete={handleDelete}
               onUpload={() => setUploadDocType(docType)}
               onViewVersions={handleViewVersions}
+              onRename={handleRename}
+              onMove={handleMove}
+              onMoveToSection={handleMoveToSection}
             />
           );
         })}
@@ -318,6 +358,25 @@ export default function CompanyDetailPage() {
           onClose={() => setVersionDocId(null)}
           onView={handleView}
           onDownload={handleDownload}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          documentId={renameTarget.id}
+          currentName={renameTarget.name}
+          onClose={() => setRenameTarget(null)}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {moveTarget && company && (
+        <MoveModal
+          documentId={moveTarget.id}
+          currentCompanyId={company.id}
+          currentDocType={moveTarget.docType}
+          onClose={() => setMoveTarget(null)}
+          onSuccess={fetchData}
         />
       )}
     </div>

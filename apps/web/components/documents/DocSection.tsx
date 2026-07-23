@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type DragEvent } from "react";
 import { ChevronDown, ChevronRight, LayoutGrid, List, Upload, FolderOpen, Search, Filter, X, Calendar, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,10 @@ interface DocSectionProps {
   onDelete: (id: string) => void;
   onUpload: (docType: string) => void;
   onViewVersions?: (id: string) => void;
+  onRename?: (id: string) => void;
+  onMove?: (id: string) => void;
+  /** Called when a file card is dropped onto this section (drag-to-move). */
+  onMoveToSection?: (docId: string, targetDocType: string) => void;
 }
 
 export default function DocSection({
@@ -44,8 +48,12 @@ export default function DocSection({
   onDelete,
   onUpload,
   onViewVersions,
+  onRename,
+  onMove,
+  onMoveToSection,
 }: DocSectionProps) {
   const [expanded, setExpanded] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"date" | "name" | "size">("date");
   const [showFilters, setShowFilters] = useState(false);
@@ -131,8 +139,40 @@ export default function DocSection({
     setFileTypeFilter("");
   };
 
+  const handleDrop = (e: DragEvent) => {
+    if (!onMoveToSection) return;
+    e.preventDefault();
+    setDragOver(false);
+    const docId =
+      e.dataTransfer.getData("application/x-doc-id") ||
+      e.dataTransfer.getData("text/plain");
+    if (docId) onMoveToSection(docId, docType);
+  };
+
   return (
-    <div className="group/section overflow-hidden rounded-2xl border border-border/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md">
+    <div
+      onDragOver={(e) => {
+        if (!onMoveToSection) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // Ignore leaves into child elements
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setDragOver(false);
+      }}
+      onDrop={handleDrop}
+      className={cn(
+        "group/section overflow-hidden rounded-2xl border border-border/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md",
+        dragOver && "ring-2 ring-[#E8611A] ring-offset-2 border-[#E8611A]/40"
+      )}
+    >
+      {dragOver && (
+        <div className="pointer-events-none flex items-center justify-center gap-2 bg-[#E8611A]/10 py-2 text-xs font-semibold text-[#E8611A]">
+          <FolderOpen className="h-3.5 w-3.5" /> Drop here to move into {typeInfo.label}
+        </div>
+      )}
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between p-5 text-left transition-colors hover:bg-muted/30"
@@ -375,6 +415,8 @@ export default function DocSection({
                 onShare={onShare}
                 onDelete={onDelete}
                 onViewVersions={onViewVersions}
+                onRename={onRename}
+                onMove={onMove}
               />
             ) : (
               <FileList
@@ -384,6 +426,8 @@ export default function DocSection({
                 onShare={onShare}
                 onDelete={onDelete}
                 onViewVersions={onViewVersions}
+                onRename={onRename}
+                onMove={onMove}
               />
             )}
           </div>

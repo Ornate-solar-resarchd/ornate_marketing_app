@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Download, Share2, Trash2, FileText, Image, Film, Play, FileSpreadsheet, Presentation, Mail } from "lucide-react";
+import { Eye, Download, Share2, Trash2, Pencil, FolderInput, FileText, Image, Film, Play, FileSpreadsheet, Presentation, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/utils";
 import PermissionGate from "@/components/rbac/PermissionGate";
@@ -22,6 +22,8 @@ interface FileCardProps {
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
   onViewVersions?: (id: string) => void;
+  onRename?: (id: string) => void;
+  onMove?: (id: string) => void;
 }
 
 function getFileIcon(mimeType: string, ext: string) {
@@ -60,6 +62,8 @@ export default function FileCard({
   onShare,
   onDelete,
   onViewVersions,
+  onRename,
+  onMove,
 }: FileCardProps) {
   const ext = originalName.split(".").pop()?.toLowerCase() || "";
   const Icon = getFileIcon(mimeType, ext);
@@ -156,7 +160,15 @@ export default function FileCard({
   };
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <div
+      draggable={!!onMove}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("application/x-doc-id", id);
+        e.dataTransfer.setData("text/plain", id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={`group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+    >
       {/* Status badges - top right */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
         {isNew && (
@@ -244,6 +256,32 @@ export default function FileCard({
               <Share2 className="h-3.5 w-3.5" />
             </Button>
           </PermissionGate>
+          {onRename && (
+            <PermissionGate permission="upload">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRename(id)}
+                title="Rename"
+                className="h-7 w-7 rounded-lg p-0 hover:bg-amber-50 hover:text-amber-600 transition-all hover:scale-110 active:scale-95"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </PermissionGate>
+          )}
+          {onMove && (
+            <PermissionGate permission="upload">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onMove(id)}
+                title="Move to another company / section"
+                className="h-7 w-7 rounded-lg p-0 hover:bg-teal-50 hover:text-teal-600 transition-all hover:scale-110 active:scale-95"
+              >
+                <FolderInput className="h-3.5 w-3.5" />
+              </Button>
+            </PermissionGate>
+          )}
           <div className="flex-1" />
           <PermissionGate permission="delete_own">
             <Button

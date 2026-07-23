@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Download, Share2, Trash2, FileText, Image, Film, History } from "lucide-react";
+import { Eye, Download, Share2, Trash2, Pencil, FolderInput, FileText, Image, Film, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/utils";
 import PermissionGate from "@/components/rbac/PermissionGate";
@@ -25,6 +25,8 @@ interface FileListProps {
   onShare: (id: string) => void;
   onDelete: (id: string) => void;
   onViewVersions?: (id: string) => void;
+  onRename?: (id: string) => void;
+  onMove?: (id: string) => void;
 }
 
 function getFileIcon(mimeType: string) {
@@ -40,6 +42,8 @@ export default function FileList({
   onShare,
   onDelete,
   onViewVersions,
+  onRename,
+  onMove,
 }: FileListProps) {
   if (documents.length === 0) {
     return (
@@ -71,7 +75,16 @@ export default function FileList({
             const isNew = Date.now() - new Date(doc.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000;
             const hasVersions = (doc.version && doc.version > 1) || doc.parentId;
             return (
-              <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+              <tr
+                key={doc.id}
+                draggable={!!onMove}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-doc-id", doc.id);
+                  e.dataTransfer.setData("text/plain", doc.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+              >
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => onView(doc.id)}>
                     {doc.mimeType.startsWith("image/") && doc.fileUrl ? (
@@ -135,6 +148,20 @@ export default function FileList({
                       <Button variant="ghost" size="sm" onClick={() => onViewVersions?.(doc.id)} className="h-7 w-7 p-0 hover:text-blue-600">
                         <History className="h-3.5 w-3.5" />
                       </Button>
+                    )}
+                    {onRename && (
+                      <PermissionGate permission="upload">
+                        <Button variant="ghost" size="sm" onClick={() => onRename(doc.id)} title="Rename" className="h-7 w-7 p-0 hover:text-amber-600">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </PermissionGate>
+                    )}
+                    {onMove && (
+                      <PermissionGate permission="upload">
+                        <Button variant="ghost" size="sm" onClick={() => onMove(doc.id)} title="Move" className="h-7 w-7 p-0 hover:text-teal-600">
+                          <FolderInput className="h-3.5 w-3.5" />
+                        </Button>
+                      </PermissionGate>
                     )}
                     <PermissionGate permission="delete_own">
                       <Button
