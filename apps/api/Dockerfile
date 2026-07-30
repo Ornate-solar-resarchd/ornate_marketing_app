@@ -31,4 +31,10 @@ ENV NODE_ENV=production
 EXPOSE 4000
 
 WORKDIR /app/apps/api
-CMD ["npx", "tsx", "src/index.ts"]
+# On container start, sync the Prisma schema to the DB before booting the API.
+# This project uses the `prisma db push` workflow (no migration files), so this
+# is the equivalent of FAT's `manage.py migrate` — schema changes apply on deploy
+# automatically. If db push exits non-zero (e.g. a destructive change without
+# --accept-data-loss), the container fails to start, surfacing the problem
+# instead of silently drifting. Client is already generated at build time.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npx tsx src/index.ts"]
