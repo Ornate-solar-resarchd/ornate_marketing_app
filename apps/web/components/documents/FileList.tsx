@@ -27,6 +27,10 @@ interface FileListProps {
   onViewVersions?: (id: string) => void;
   onRename?: (id: string) => void;
   onMove?: (id: string) => void;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string, shiftKey: boolean) => void;
+  onToggleSelectAll?: () => void;
 }
 
 function getFileIcon(mimeType: string) {
@@ -44,7 +48,13 @@ export default function FileList({
   onViewVersions,
   onRename,
   onMove,
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: FileListProps) {
+  const allSelected =
+    selectable && documents.length > 0 && documents.every((d) => selectedIds?.has(d.id));
   if (documents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -61,6 +71,17 @@ export default function FileList({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            {selectable && (
+              <th className="pb-2 pr-2 w-8">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() => onToggleSelectAll?.()}
+                  className="h-3.5 w-3.5 accent-[#E8611A] cursor-pointer align-middle"
+                  title={allSelected ? "Deselect all" : "Select all"}
+                />
+              </th>
+            )}
             <th className="pb-2 pr-4 font-medium">Name</th>
             <th className="pb-2 pr-4 font-medium">Version</th>
             <th className="pb-2 pr-4 font-medium">Size</th>
@@ -83,8 +104,25 @@ export default function FileList({
                   e.dataTransfer.setData("text/plain", doc.id);
                   e.dataTransfer.effectAllowed = "move";
                 }}
-                className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+                className={`border-b border-border last:border-0 transition-colors ${
+                  selectedIds?.has(doc.id) ? "bg-[#E8611A]/5" : "hover:bg-muted/20"
+                } ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
               >
+                {selectable && (
+                  <td className="py-3 pr-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(doc.id) ?? false}
+                      onChange={(e) =>
+                        onToggleSelect?.(
+                          doc.id,
+                          (e.nativeEvent as MouseEvent & { shiftKey?: boolean }).shiftKey ?? false
+                        )
+                      }
+                      className="h-3.5 w-3.5 accent-[#E8611A] cursor-pointer align-middle"
+                    />
+                  </td>
+                )}
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => onView(doc.id)}>
                     {doc.mimeType.startsWith("image/") && doc.fileUrl ? (

@@ -14,6 +14,7 @@ import ShareModal from "@/components/documents/ShareModal";
 import VersionHistory from "@/components/documents/VersionHistory";
 import RenameModal from "@/components/documents/RenameModal";
 import MoveModal from "@/components/documents/MoveModal";
+import BulkMoveModal from "@/components/documents/BulkMoveModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DOC_TYPES, type DocTypeKey } from "@ornate/types";
 import api from "@/lib/api";
@@ -63,6 +64,10 @@ export default function CompanyDetailPage() {
   const [versionDocName, setVersionDocName] = useState("");
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [moveTarget, setMoveTarget] = useState<{ id: string; docType: string } | null>(null);
+  const [bulkMoveTarget, setBulkMoveTarget] = useState<{
+    ids: string[];
+    docType: string;
+  } | null>(null);
 
   // Find a document (and the section it currently lives in) by id.
   const findDoc = (docId: string): { doc: DocumentData; docType: string } | null => {
@@ -169,6 +174,11 @@ export default function CompanyDetailPage() {
   const handleMove = (docId: string) => {
     const found = findDoc(docId);
     if (found) setMoveTarget({ id: docId, docType: found.docType });
+  };
+
+  const handleBulkMove = (docIds: string[], fromDocType: string) => {
+    if (docIds.length === 0) return;
+    setBulkMoveTarget({ ids: docIds, docType: fromDocType });
   };
 
   // Drag-and-drop: a file card dropped onto another section → move (change docType).
@@ -303,6 +313,7 @@ export default function CompanyDetailPage() {
               onRename={handleRename}
               onMove={handleMove}
               onMoveToSection={handleMoveToSection}
+              onBulkMove={handleBulkMove}
             />
           );
         })}
@@ -376,6 +387,16 @@ export default function CompanyDetailPage() {
           currentCompanyId={company.id}
           currentDocType={moveTarget.docType}
           onClose={() => setMoveTarget(null)}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {bulkMoveTarget && company && (
+        <BulkMoveModal
+          documentIds={bulkMoveTarget.ids}
+          currentCompanyId={company.id}
+          currentDocType={bulkMoveTarget.docType}
+          onClose={() => setBulkMoveTarget(null)}
           onSuccess={fetchData}
         />
       )}

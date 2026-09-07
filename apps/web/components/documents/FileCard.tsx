@@ -24,6 +24,10 @@ interface FileCardProps {
   onViewVersions?: (id: string) => void;
   onRename?: (id: string) => void;
   onMove?: (id: string) => void;
+  /** Bulk selection — omitted entirely when the section isn't selectable. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, shiftKey: boolean) => void;
 }
 
 function getFileIcon(mimeType: string, ext: string) {
@@ -64,6 +68,9 @@ export default function FileCard({
   onViewVersions,
   onRename,
   onMove,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: FileCardProps) {
   const ext = originalName.split(".").pop()?.toLowerCase() || "";
   const Icon = getFileIcon(mimeType, ext);
@@ -167,8 +174,38 @@ export default function FileCard({
         e.dataTransfer.setData("text/plain", id);
         e.dataTransfer.effectAllowed = "move";
       }}
-      className={`group relative overflow-hidden rounded-2xl border border-border/50 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+      className={`group relative overflow-hidden rounded-2xl border bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+        selected
+          ? "border-[#E8611A] ring-2 ring-[#E8611A]/30 shadow-md"
+          : "border-border/50"
+      } ${onMove ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
+      {/* Selection checkbox — top left. Hidden until hover unless already
+          selected, so an unselected grid stays visually clean. */}
+      {selectable && (
+        <label
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute top-2 left-2 z-20 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border bg-white/95 shadow-sm backdrop-blur-sm transition-opacity ${
+            selected
+              ? "border-[#E8611A] opacity-100"
+              : "border-border/60 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+          }`}
+          title={selected ? "Deselect" : "Select"}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) =>
+              onToggleSelect?.(
+                id,
+                (e.nativeEvent as MouseEvent & { shiftKey?: boolean }).shiftKey ?? false
+              )
+            }
+            className="h-3.5 w-3.5 accent-[#E8611A] cursor-pointer"
+          />
+        </label>
+      )}
+
       {/* Status badges - top right */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
         {isNew && (

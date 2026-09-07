@@ -6,11 +6,14 @@ import {
   getSharedDocument,
   getDocumentsByCompany,
   getDocumentViewUrl,
+  moveDocuments,
 } from "../../services/document.service";
 import { prisma } from "../../lib/prisma";
 import * as s3Service from "../../services/s3.service";
 
-const mockPrisma = vi.mocked(prisma);
+// `deep` types the nested delegate methods (document.findMany, $transaction, …)
+// as mocks. Without it every `mockResolvedValue` in this file is a type error.
+const mockPrisma = vi.mocked(prisma, { deep: true });
 const mockS3 = vi.mocked(s3Service);
 
 const mockDocument = {
@@ -27,6 +30,10 @@ const mockDocument = {
   uploaderName: "Test User",
   shareToken: null,
   shareExpiry: null,
+  description: "",
+  tags: [],
+  version: 1,
+  parentId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -280,6 +287,233 @@ describe("Document Service", () => {
       const result = await getDocumentsByCompany("company_1");
 
       expect(Object.keys(result)).toHaveLength(0);
+    });
+  });
+
+  describe("moveDocuments()", () => {
+    const targetCompany = {
+      id: "company_2",
+      slug: "hopewind",
+      label: "Hopewind",
+      icon: "🔋",
+      color: "#10B981",
+      logoUrl: "logo.png",
+      websiteUrl: "https://hopewind.com",
+      docTypes: ["brochure", "datasheet"],
+      categoryId: "cat_1",
+      subCategoryId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // $transaction receives a callback and must run it against a client; hand
+    // it the same mocked prisma so assertions can inspect updateMany/createMany.
+    const runTransaction = () => {
+      mockPrisma.$transaction.mockImplementation(
+        async (cb: unknown) => (cb as (tx: unknown) => Promise<unknown>)(mockPrisma)
+      );
+      mockPrisma.document.updateMany.mockResolvedValue({ count: 1 } as never);
+      mockPrisma.auditLog.createMany.mockResolvedValue({ count: 1 } as never);
+    };
+
+    it("moves every selected document to the target section", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1" },
+        { ...mockDocument, id: "doc_2" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1", "doc_2"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toEqual(["doc_1", "doc_2"]);
+      expect(result.skipped).toHaveLength(0);
+      expect(mockPrisma.document.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["doc_1", "doc_2"] } },
+        data: { companyId: "company_1", docType: "datasheet" },
+      });
+    });
+
+    it("writes one audit row per moved document", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1" },
+        { ...mockDocument, id: "doc_2" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      await moveDocuments(["doc_1", "doc_2"], { docType: "datasheet" }, "user_1", "manager");
+
+      const auditArg = mockPrisma.auditLog.createMany.mock.calls[0]![0] as {
+        data: Array<{ docId: string; action: string }>;
+      };
+      expect(auditArg.data).toHaveLength(2);
+      expect(auditArg.data.map((d) => d.docId)).toEqual(["doc_1", "doc_2"]);
+      expect(auditArg.data.every((d) => d.action === "move")).toBe(true);
+    });
+
+    it("skips other users' files for a non-admin but still moves their own", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1", uploadedBy: "user_1" },
+        { ...mockDocument, id: "doc_2", uploadedBy: "someone_else" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1", "doc_2"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toEqual(["doc_1"]);
+      expect(result.skipped).toEqual([
+        { id: "doc_2", name: mockDocument.name, reason: "Uploaded by someone else" },
+      ]);
+    });
+
+    it("lets an admin move files uploaded by others", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1", uploadedBy: "someone_else" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1"],
+        { docType: "datasheet" },
+        "admin_user",
+        "admin"
+      );
+
+      expect(result.moved).toEqual(["doc_1"]);
+      expect(result.skipped).toHaveLength(0);
+    });
+
+    it("reports ids that no longer exist instead of failing the batch", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([{ ...mockDocument, id: "doc_1" }]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1", "doc_missing"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toEqual(["doc_1"]);
+      expect(result.skipped).toContainEqual({
+        id: "doc_missing",
+        name: null,
+        reason: "Document not found",
+      });
+    });
+
+    it("skips documents already in the destination", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1", docType: "datasheet" },
+        { ...mockDocument, id: "doc_2", docType: "brochure" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1", "doc_2"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toEqual(["doc_2"]);
+      expect(result.skipped).toEqual([
+        { id: "doc_1", name: mockDocument.name, reason: "Already in that location" },
+      ]);
+    });
+
+    it("never touches the database when nothing is movable", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([
+        { ...mockDocument, id: "doc_1", docType: "datasheet" },
+      ]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toHaveLength(0);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(mockPrisma.document.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects a section the target company does not have", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([{ ...mockDocument, id: "doc_1" }]);
+      mockPrisma.company.findMany.mockResolvedValue([targetCompany]);
+
+      await expect(
+        moveDocuments(
+          ["doc_1"],
+          { companyId: "company_2", docType: "warranty" },
+          "user_1",
+          "manager"
+        )
+      ).rejects.toThrow("That section does not exist in the target company");
+    });
+
+    it("rejects an unknown target company", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([{ ...mockDocument, id: "doc_1" }]);
+      mockPrisma.company.findMany.mockResolvedValue([]);
+
+      await expect(
+        moveDocuments(["doc_1"], { companyId: "nope" }, "user_1", "manager")
+      ).rejects.toThrow("Target company not found");
+    });
+
+    it("rejects an empty selection", async () => {
+      await expect(
+        moveDocuments([], { docType: "datasheet" }, "user_1", "manager")
+      ).rejects.toThrow("No documents selected");
+    });
+
+    it("deduplicates repeated ids so a file moves once", async () => {
+      mockPrisma.document.findMany.mockResolvedValue([{ ...mockDocument, id: "doc_1" }]);
+      mockPrisma.company.findMany.mockResolvedValue([
+        { ...targetCompany, id: "company_1" },
+      ]);
+      runTransaction();
+
+      const result = await moveDocuments(
+        ["doc_1", "doc_1", "doc_1"],
+        { docType: "datasheet" },
+        "user_1",
+        "manager"
+      );
+
+      expect(result.moved).toEqual(["doc_1"]);
     });
   });
 

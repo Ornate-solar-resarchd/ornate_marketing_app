@@ -346,6 +346,148 @@ export async function moveDocument(
   return updated;
 }
 
+export interface BulkMoveResult {
+  moved: string[];
+  skipped: Array<{ id: string; name: string | null; reason: string }>;
+}
+
+/**
+ * Move many documents in one request.
+ *
+ * Partial success is the normal outcome, not an error: a manager selecting a
+ * whole section will often include a file someone else uploaded, and failing
+ * the entire batch over one such file would make bulk move useless. Per-document
+ * problems (missing, not yours, already there) land in `skipped` and the rest
+ * still move. Only problems with the *target* — unknown company, section the
+ * target company doesn't have — throw, since those invalidate the whole request.
+ */
+export async function moveDocuments(
+  documentIds: string[],
+  target: { companyId?: string; docType?: string },
+  userId: string,
+  userRole: string
+): Promise<BulkMoveResult> {
+  const ids = Array.from(new Set(documentIds));
+  if (ids.length === 0) {
+    throw new Error("No documents selected");
+  }
+
+  const documents = await prisma.document.findMany({ where: { id: { in: ids } } });
+  const byId = new Map(documents.map((d) => [d.id, d]));
+
+  const moved: string[] = [];
+  const skipped: BulkMoveResult["skipped"] = [];
+
+  for (const id of ids) {
+    if (!byId.has(id)) skipped.push({ id, name: null, reason: "Document not found" });
+  }
+
+  // Each document's destination falls back to where it already is, so a caller
+  // may change only the company, only the section, or both. Resolve every
+  // distinct destination company up front rather than querying per document.
+  const isPrivileged = userRole === "super_admin" || userRole === "admin";
+  const targetCompanyIds = new Set(
+    documents.map((doc) => target.companyId || doc.companyId)
+  );
+  const companies = await prisma.company.findMany({
+    where: { id: { in: Array.from(targetCompanyIds) } },
+  });
+  const companyById = new Map(companies.map((c) => [c.id, c]));
+
+  // An explicit target the caller named must exist — that's a bad request, not
+  // a per-document skip.
+  if (target.companyId && !companyById.has(target.companyId)) {
+    throw new Error("Target company not found");
+  }
+
+  // Group the movable documents by destination so each distinct destination is
+  // a single updateMany instead of one update per document.
+  const groups = new Map<string, { companyId: string; docType: string; ids: string[] }>();
+
+  for (const doc of documents) {
+    if (!isPrivileged && doc.uploadedBy !== userId) {
+      skipped.push({
+        id: doc.id,
+        name: doc.name,
+        reason: "Uploaded by someone else",
+      });
+      continue;
+    }
+
+    const toCompanyId = target.companyId || doc.companyId;
+    const toDocType = target.docType || doc.docType;
+
+    if (toCompanyId === doc.companyId && toDocType === doc.docType) {
+      skipped.push({ id: doc.id, name: doc.name, reason: "Already in that location" });
+      continue;
+    }
+
+    const company = companyById.get(toCompanyId);
+    if (!company) {
+      skipped.push({ id: doc.id, name: doc.name, reason: "Target company not found" });
+      continue;
+    }
+    if (!company.docTypes.includes(toDocType)) {
+      // With an explicit target section this is a whole-request error: the user
+      // picked a section that company doesn't have, so nothing can move there.
+      if (target.docType) {
+        throw new Error("That section does not exist in the target company");
+      }
+      skipped.push({
+        id: doc.id,
+        name: doc.name,
+        reason: `${company.label} has no ${doc.docType} section`,
+      });
+      continue;
+    }
+
+    const key = `${toCompanyId}::${toDocType}`;
+    const group = groups.get(key) ?? { companyId: toCompanyId, docType: toDocType, ids: [] };
+    group.ids.push(doc.id);
+    groups.set(key, group);
+  }
+
+  if (groups.size === 0) {
+    return { moved, skipped };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const group of groups.values()) {
+      await tx.document.updateMany({
+        where: { id: { in: group.ids } },
+        data: { companyId: group.companyId, docType: group.docType },
+      });
+      moved.push(...group.ids);
+    }
+
+    // One audit row per document, matching what a sequence of single moves
+    // would have written — bulk is a UI convenience, not a different event.
+    await tx.auditLog.createMany({
+      data: Array.from(groups.values()).flatMap((group) =>
+        group.ids.map((id) => {
+          const doc = byId.get(id)!;
+          return {
+            userId,
+            action: "move",
+            docId: id,
+            companyId: group.companyId,
+            meta: {
+              fromCompany: doc.companyId,
+              toCompany: group.companyId,
+              fromDocType: doc.docType,
+              toDocType: group.docType,
+              bulk: true,
+              batchSize: ids.length,
+            },
+          };
+        })
+      ),
+    });
+  });
+
+  return { moved, skipped };
+}
+
 export async function generateShareLink(documentId: string, userId: string) {
   const shareToken = uuidv4();
   const shareExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);

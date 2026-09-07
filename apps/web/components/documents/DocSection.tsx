@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, type DragEvent } from "react";
-import { ChevronDown, ChevronRight, LayoutGrid, List, Upload, FolderOpen, Search, Filter, X, Calendar, Tag } from "lucide-react";
+import { useState, useMemo, useRef, type DragEvent } from "react";
+import { ChevronDown, ChevronRight, LayoutGrid, List, Upload, FolderOpen, Search, Filter, X, Calendar, Tag, FolderInput, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,9 @@ interface DocSectionProps {
   onMove?: (id: string) => void;
   /** Called when a file card is dropped onto this section (drag-to-move). */
   onMoveToSection?: (docId: string, targetDocType: string) => void;
+  /** Opens the bulk-move modal for the current selection. Selection UI is
+   *  hidden entirely when this is not provided (e.g. viewer-only roles). */
+  onBulkMove?: (docIds: string[], fromDocType: string) => void;
 }
 
 export default function DocSection({
@@ -51,8 +54,12 @@ export default function DocSection({
   onRename,
   onMove,
   onMoveToSection,
+  onBulkMove,
 }: DocSectionProps) {
   const [expanded, setExpanded] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Anchor for shift-click range selection, in the current filtered order.
+  const lastClickedId = useRef<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"date" | "name" | "size">("date");
@@ -132,6 +139,66 @@ export default function DocSection({
 
   const hasActiveFilters = searchQuery || selectedTag || dateFilter !== "all" || fileTypeFilter;
 
+  const selectable = !!onBulkMove;
+  // Only ever act on selected files that are actually visible — a file hidden
+  // by a filter must not be dragged along by a "Move selected" click.
+  const visibleSelectedIds = useMemo(
+    () => filtered.filter((d) => selectedIds.has(d.id)).map((d) => d.id),
+    [filtered, selectedIds]
+  );
+  const allVisibleSelected =
+    filtered.length > 0 && visibleSelectedIds.length === filtered.length;
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    lastClickedId.current = null;
+  };
+
+  const toggleSelect = (id: string, shiftKey: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const anchor = lastClickedId.current;
+
+      // Shift-click extends from the last clicked file to this one, matching
+      // the range-select behaviour people expect from a file manager.
+      if (shiftKey && anchor && anchor !== id) {
+        const order = filtered.map((d) => d.id);
+        const from = order.indexOf(anchor);
+        const to = order.indexOf(id);
+        if (from !== -1 && to !== -1) {
+          const [start, end] = from < to ? [from, to] : [to, from];
+          const selecting = !prev.has(id);
+          for (const rangeId of order.slice(start, end + 1)) {
+            if (selecting) next.add(rangeId);
+            else next.delete(rangeId);
+          }
+          lastClickedId.current = id;
+          return next;
+        }
+      }
+
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      lastClickedId.current = id;
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      clearSelection();
+      return;
+    }
+    setSelectedIds(new Set(filtered.map((d) => d.id)));
+  };
+
+  const handleToggleExpanded = () => {
+    // Collapsing hides the checkboxes, so a selection left behind would be
+    // invisible but still live — drop it rather than leave a hidden selection.
+    if (expanded) clearSelection();
+    setExpanded(!expanded);
+  };
+
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedTag("");
@@ -174,7 +241,7 @@ export default function DocSection({
         </div>
       )}
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggleExpanded}
         className="flex w-full items-center justify-between p-5 text-left transition-colors hover:bg-muted/30"
       >
         <div className="flex items-center gap-4">
@@ -290,6 +357,20 @@ export default function DocSection({
                 )}
               </Button>
 
+              {/* Select all — the grid's per-card checkboxes only appear on
+                  hover, so this is the discoverable way into bulk selection. */}
+              {selectable && filtered.length > 0 && visibleSelectedIds.length === 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSelectAll}
+                  className="h-8 rounded-xl text-xs gap-1"
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  Select
+                </Button>
+              )}
+
               {/* Upload */}
               <PermissionGate permission="upload">
                 <Button
@@ -302,6 +383,39 @@ export default function DocSection({
                 </Button>
               </PermissionGate>
             </div>
+
+            {/* Bulk selection bar — only while something is selected */}
+            {selectable && visibleSelectedIds.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#E8611A]/30 bg-[#E8611A]/5 px-3 py-2.5 animate-fade-in">
+                <CheckSquare className="h-4 w-4 text-[#E8611A]" />
+                <span className="text-xs font-semibold text-[#E8611A]">
+                  {visibleSelectedIds.length} selected
+                </span>
+                <button
+                  onClick={toggleSelectAll}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-white/70 transition-colors"
+                >
+                  {allVisibleSelected ? "Deselect all" : `Select all ${filtered.length}`}
+                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={clearSelection}
+                    className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-white/70 transition-colors"
+                  >
+                    Clear
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={() => onBulkMove?.(visibleSelectedIds, docType)}
+                    className="h-8 rounded-xl bg-[#E8611A] hover:bg-[#D4550F] text-xs shadow-md shadow-orange-200/30 transition-all hover:scale-105 active:scale-95"
+                  >
+                    <FolderInput className="mr-1 h-3.5 w-3.5" />
+                    Move {visibleSelectedIds.length} file
+                    {visibleSelectedIds.length === 1 ? "" : "s"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Filter bar */}
             {showFilters && (
@@ -417,6 +531,9 @@ export default function DocSection({
                 onViewVersions={onViewVersions}
                 onRename={onRename}
                 onMove={onMove}
+                selectable={selectable}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
               />
             ) : (
               <FileList
@@ -428,6 +545,10 @@ export default function DocSection({
                 onViewVersions={onViewVersions}
                 onRename={onRename}
                 onMove={onMove}
+                selectable={selectable}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
               />
             )}
           </div>

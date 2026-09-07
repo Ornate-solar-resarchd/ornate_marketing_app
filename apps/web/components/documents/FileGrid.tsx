@@ -24,6 +24,9 @@ interface FileGridProps {
   onViewVersions?: (id: string) => void;
   onRename?: (id: string) => void;
   onMove?: (id: string) => void;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string, shiftKey: boolean) => void;
 }
 
 export default function FileGrid({
@@ -35,6 +38,9 @@ export default function FileGrid({
   onViewVersions,
   onRename,
   onMove,
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
 }: FileGridProps) {
   if (documents.length === 0) {
     return (
@@ -63,6 +69,9 @@ export default function FileGrid({
           onViewVersions={onViewVersions}
           onRename={onRename}
           onMove={onMove}
+          selectable={selectable}
+          selected={selectedIds?.has(doc.id) ?? false}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </div>

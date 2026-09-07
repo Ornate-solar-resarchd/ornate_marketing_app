@@ -1,7 +1,22 @@
+# These patterns are matched against paths relative to the build context, so a
+# bare `node_modules` only ever excluded the root one. Any workspace copy —
+# apps/web/node_modules, apps/api/node_modules — was still copied in by
+# `COPY apps/web ./apps/web`, landing host symlinks (absolute /Users/... paths
+# on macOS) on top of the correct tree the deps stage had just installed. The
+# build then failed to resolve packages that were demonstrably present.
+# The `**/` forms below are what actually exclude the nested copies, so running
+# `pnpm install` locally can no longer break an image build.
 node_modules
+**/node_modules
 .next
+**/.next
 dist
+**/dist
+*.tsbuildinfo
+**/*.tsbuildinfo
 .git
 .env
 .env.local
 .env.production
+**/.env.local
+**/.env.production

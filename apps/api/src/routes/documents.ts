@@ -7,10 +7,15 @@ import {
   deleteDocument,
   renameDocument,
   moveDocument,
+  moveDocuments,
 } from "../services/document.service";
 import { logger } from "../lib/logger";
 
 const router: Router = Router();
+
+// Cap on one bulk-move request. Keeps a runaway "select all" from writing an
+// unbounded number of audit rows inside a single transaction.
+const BULK_MOVE_LIMIT = 200;
 
 router.get("/companies/:id/documents", async (req, res) => {
   try {
@@ -146,6 +151,73 @@ router.patch(
             ? 400
             : 500;
       res.status(status).json({ error: message, code: "MOVE_ERROR" });
+    }
+  }
+);
+
+// PATCH /documents/bulk-move — move many documents in one request.
+// Declared before nothing in particular: "/documents/bulk-move" has two path
+// segments and "/documents/:id/move" has three, so the two never collide.
+router.patch(
+  "/documents/bulk-move",
+  requirePermission("upload"),
+  async (req, res) => {
+    try {
+      const rawIds = req.body?.documentIds;
+      if (!Array.isArray(rawIds) || rawIds.length === 0) {
+        res.status(400).json({
+          error: "Select at least one file to move",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+      const documentIds = rawIds.filter(
+        (id: unknown): id is string => typeof id === "string" && id.length > 0
+      );
+      if (documentIds.length === 0) {
+        res.status(400).json({ error: "No valid document ids", code: "VALIDATION_ERROR" });
+        return;
+      }
+      if (documentIds.length > BULK_MOVE_LIMIT) {
+        res.status(400).json({
+          error: `Cannot move more than ${BULK_MOVE_LIMIT} files at once`,
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const companyId = typeof req.body?.companyId === "string" ? req.body.companyId : undefined;
+      const docType = typeof req.body?.docType === "string" ? req.body.docType : undefined;
+      if (!companyId && !docType) {
+        res.status(400).json({
+          error: "Choose a destination company or section",
+          code: "VALIDATION_ERROR",
+        });
+        return;
+      }
+
+      const result = await moveDocuments(
+        documentIds,
+        { companyId, docType },
+        req.user!.userId,
+        req.user!.role
+      );
+
+      res.json({
+        message: `${result.moved.length} of ${documentIds.length} file(s) moved`,
+        movedCount: result.moved.length,
+        requestedCount: documentIds.length,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Error bulk-moving documents:", error);
+      const status = message.includes("not found")
+        ? 404
+        : message.includes("section does not exist") || message.includes("No documents selected")
+          ? 400
+          : 500;
+      res.status(status).json({ error: message, code: "BULK_MOVE_ERROR" });
     }
   }
 );

@@ -21,13 +21,18 @@ vi.mock("../lib/prisma", () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
     },
     auditLog: {
       findMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
     },
+    // Bulk operations run inside $transaction. Default to handing the callback
+    // the same mocked client so tests can assert on the calls it makes.
+    $transaction: vi.fn(),
   },
 }));
 
